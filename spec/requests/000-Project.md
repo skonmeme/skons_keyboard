@@ -17,6 +17,7 @@ macOS 26 이상, Apple Silicon 전용
 - 웹 브라우저: Safari, Firefox, Chrome
 - 에디터: Zed
 - 터미널: 기본 터미널, ghostty
+  - 한글 조합 중 Return/Esc가 무시되는 문제: 손쉬운 사용 권한이 있으면 조합 확정 후 원래 키는 삼키고 같은 키를 다시 보내 해결. 권한이 없으면 기존 동작 유지
 - 메신저: Slack, Apple messages
 - 이메일: Apple mail
 4. AI 기능
