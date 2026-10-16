@@ -3,7 +3,7 @@
 - 관련 요청: `spec/requests/000-Project.md`의 "4. AI 기능 - 음성인식 자동입력 (한글, 영어 상관없이)"
 - 관련 스펙: `spec/STANDARD.md` §6 (아직 미정)
 - 상태: 결정 대기
-- 조사 시점: 2026-10, macOS 26.7.1 / Apple M4 Pro 기준
+- 조사 시점: 2026-10. 조사는 macOS 26.7.1 / Apple M4 Pro에서 했고, 대상 OS는 macOS 27 이상임.
 
 ## 정해야 할 것
 
