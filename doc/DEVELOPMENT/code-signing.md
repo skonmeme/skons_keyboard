@@ -1,8 +1,8 @@
 # 코드 서명 방식
 
-- 관련 요청: `spec/requests/000-Project.md`의 "대상 환경: macOS 27 이상"
+- 관련 요청: `spec/requests/000-Project.md`의 "대상 환경: macOS 26 이상"
 - 관련 스펙: `spec/STANDARD.md` §2.3 (설치)
-- 상태: 결정 대기 (macOS 27에서 실측 필요)
+- 상태: 결정 대기 (macOS 27로 올릴 때 실측 필요)
 - 조사 시점: 2026-10
 
 ## 배경

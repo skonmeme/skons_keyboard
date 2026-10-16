@@ -6,7 +6,7 @@
 skon's Keyboard (skon은 소문자)
 
 # 대상 환경
-macOS 27 이상, Apple Silicon 전용
+macOS 26 이상, Apple Silicon 전용
 
 # 기능
 1. 키보드 전환: shift + space
