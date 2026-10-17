@@ -18,18 +18,26 @@
 | Xcode에 연결된 개발자 계정 | 있음. 유료 개인 팀(무료 팀 아님) |
 | 그 계정의 Apple ID가 사용자가 말한 주소인지 | 확인 못 함. Xcode가 계정을 내부 ID로만 저장함 |
 | 멤버십 만료일 | 확인 못 함. developer.apple.com 로그인 필요 |
-| Developer ID Application 인증서 (앱 서명용) | 없음 |
-| Developer ID Installer 인증서 (설치본 서명용) | 없음 |
-| 공증용 자격 증명 (`notarytool` 키체인 프로필) | 확인 안 함. 설치본을 만들 때 설정 |
+| Developer ID Application 인증서 (앱 서명용) | 있음. 2026-10-17 발급, 2027-02-01 만료 |
+| Developer ID Installer 인증서 (설치본 서명용) | 있음. 2026-10-17 발급, 2027-02-01 만료 |
+| 공증용 자격 증명 | App Store Connect API 키(팀 키) 발급됨. `notarytool` 등록은 확인을 기다림 |
 | 도구 (`notarytool`, `productbuild`) | 있음 |
 
 - 지금 있는 Apple Development 인증서는 개발용이라 배포용 서명에 쓸 수 없음.
 
+## 인증서 만료
+
+- 두 Developer ID 인증서는 오늘 발급됐지만 2027-02-01에 만료됨. 발급한 상위 인증 기관(Developer ID Certification Authority)이 그날 만료되기 때문으로 보임.
+- Apple 안내에 따르면 만료 후에는 다음과 같음.
+  - 서명한 앱은 계속 내려받고 설치하고 실행할 수 있음.
+  - 만료된 Developer ID Installer 인증서로 서명한 설치본은 유효한 인증서로 다시 서명해야 설치할 수 있음.
+- 따라서 2027-02-01 전에 두 인증서를 새로 만들어야 함. 그 뒤에 만드는 설치본은 새 인증서로 서명함.
+
 ## 준비할 일 (사용자가 직접)
 
-1. Xcode > Settings > Accounts에서 계정이 맞는지 확인함.
-2. 같은 화면의 "Manage Certificates"에서 Developer ID Application과 Developer ID Installer 인증서를 만듦. Developer ID 인증서는 계정 소유자만 만들 수 있으며, 개인 팀이면 본인이 소유자임.
-3. 설치본을 만들 때 `xcrun notarytool store-credentials`로 공증용 자격 증명을 키체인에 저장함. 이때 앱 암호를 입력해야 하므로 직접 실행해야 함.
+1. 완료: Xcode에서 계정 확인
+2. 완료: Developer ID Application과 Developer ID Installer 인증서 생성
+3. 남음: App Store Connect API 키를 `xcrun notarytool store-credentials`로 키체인 프로필에 저장함. 개인 키(.p8)를 다루므로 직접 실행해야 함. 저장한 뒤 프로필 이름을 알려주면 `xcrun notarytool history`로 동작을 확인함.
 
 ## 설치본을 만들 때 지킬 점
 
