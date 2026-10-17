@@ -20,7 +20,7 @@
 | 멤버십 만료일 | 확인 못 함. developer.apple.com 로그인 필요 |
 | Developer ID Application 인증서 (앱 서명용) | 있음. 2026-10-17 발급, 2027-02-01 만료 |
 | Developer ID Installer 인증서 (설치본 서명용) | 있음. 2026-10-17 발급, 2027-02-01 만료 |
-| 공증용 자격 증명 | App Store Connect API 키(팀 키) 발급됨. `notarytool` 등록은 확인을 기다림 |
+| 공증용 자격 증명 | 있음. App Store Connect API 키를 키체인 프로필 `skon's Universe`로 등록함. 2026-10-17에 `notarytool history`로 인증되는 것을 확인함 |
 | 도구 (`notarytool`, `productbuild`) | 있음 |
 
 - 지금 있는 Apple Development 인증서는 개발용이라 배포용 서명에 쓸 수 없음.
@@ -37,7 +37,7 @@
 
 1. 완료: Xcode에서 계정 확인
 2. 완료: Developer ID Application과 Developer ID Installer 인증서 생성
-3. 남음: App Store Connect API 키를 `xcrun notarytool store-credentials`로 키체인 프로필에 저장함. 개인 키(.p8)를 다루므로 직접 실행해야 함. 저장한 뒤 프로필 이름을 알려주면 `xcrun notarytool history`로 동작을 확인함.
+3. 완료: App Store Connect API 키를 키체인 프로필(`skon's Universe`)로 등록. 공증할 때 `xcrun notarytool submit --keychain-profile "skon's Universe"`로 사용함.
 
 ## 설치본을 만들 때 지킬 점
 
