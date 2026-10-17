@@ -4,6 +4,46 @@ This is the specification of skon's Keyboard. It is the only normative
 document of the project: when any other document or the source code conflicts
 with it, this document is correct and the other must be fixed (§9.1).
 
+## Contents
+
+- [1. Overview](#1-overview)
+  - [1.1 Purpose](#11-purpose)
+  - [1.2 Scope](#12-scope)
+  - [1.3 Conventions](#13-conventions)
+- [2. Platform and Technology](#2-platform-and-technology)
+  - [2.1 Platform](#21-platform)
+  - [2.2 Implementation](#22-implementation)
+  - [2.3 Identity and installation](#23-identity-and-installation)
+  - [2.4 Resource and privacy constraints](#24-resource-and-privacy-constraints)
+- [3. Modes and Switching](#3-modes-and-switching)
+- [4. Korean Mode](#4-korean-mode)
+  - [4.1 Layout](#41-layout)
+  - [4.2 Composition](#42-composition)
+  - [4.3 Text representation](#43-text-representation)
+  - [4.4 Key handling](#44-key-handling)
+  - [4.5 Return and Escape in terminals](#45-return-and-escape-in-terminals)
+- [5. English Mode](#5-english-mode)
+- [6. Voice Input](#6-voice-input)
+- [7. Application Compatibility](#7-application-compatibility)
+  - [7.1 Guaranteed applications](#71-guaranteed-applications)
+  - [7.2 Client interaction rules](#72-client-interaction-rules)
+  - [7.3 Acceptance scenarios](#73-acceptance-scenarios)
+  - [7.4 Known limitations](#74-known-limitations)
+  - [7.5 Verification](#75-verification)
+- [8. Distribution and Installation](#8-distribution-and-installation)
+  - [8.1 Installer](#81-installer)
+  - [8.2 Accessibility permission](#82-accessibility-permission)
+  - [8.3 Uninstaller](#83-uninstaller)
+  - [8.4 Signing and notarization](#84-signing-and-notarization)
+  - [8.5 Building the packages](#85-building-the-packages)
+  - [8.6 Verification](#86-verification)
+- [9. Project Documents and Process](#9-project-documents-and-process)
+  - [9.1 Documents](#91-documents)
+  - [9.2 Spec requests](#92-spec-requests)
+  - [9.3 Work branches](#93-work-branches)
+  - [9.4 Applying a request](#94-applying-a-request)
+  - [9.5 Discussion items](#95-discussion-items)
+
 ## 1. Overview
 
 ### 1.1 Purpose
