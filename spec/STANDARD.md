@@ -1,14 +1,14 @@
-# Skon's Keyboard — Standard
+# skon's Keyboard — Standard
 
-This is the specification of Skon's Keyboard. It is the only normative
+This is the specification of skon's Keyboard. It is the only normative
 document of the project: when any other document or the source code conflicts
-with it, this document is correct and the other must be fixed (§8.1).
+with it, this document is correct and the other must be fixed (§9.1).
 
 ## 1. Overview
 
 ### 1.1 Purpose
 
-Skon's Keyboard is a Korean/English input method for macOS. It is built for
+skon's Keyboard is a Korean/English input method for macOS. It is built for
 one user's needs, not as a general-purpose input method: it provides only the
 features in this document and is designed to stay lightweight.
 
@@ -21,6 +21,7 @@ features in this document and is designed to stay lightweight.
 | English input with the QWERTY layout | §5 |
 | Voice input for Korean and English speech | §6 (not yet specified) |
 | Guaranteed operation in a fixed list of applications | §7 |
+| Installation and removal with signed packages | §8 |
 
 Out of scope: other Hangul layouts (2-set, 3-90, ...), Old Hangul, Hanja
 conversion, auto-correction or prediction, a settings UI or configuration
@@ -51,8 +52,10 @@ macOS versions and Intel Macs are not supported.
 ### 2.2 Implementation
 
 - The product is an input method bundle built on InputMethodKit. Typing
-  (§3–§5) MUST work without a helper process, a login item, or the
-  Accessibility or Input Monitoring permission.
+  (§3–§5) MUST work without a helper process, a login item, the Input
+  Monitoring permission or the Accessibility permission.
+- The Accessibility permission is optional. When granted, it enables only the
+  handling of Return and Escape in terminals (§4.5).
 - The implementation language is Rust. Apple frameworks are called through
   the objc2 crates.
 - Swift MAY be used only for an Apple API that cannot be called from Rust.
@@ -62,20 +65,21 @@ macOS versions and Intel Macs are not supported.
 
 | Item | Value |
 |---|---|
-| Display name | Skon's Keyboard |
+| Display name | skon's Keyboard |
 | Bundle | `SkonsKeyboard.app` |
 | Bundle identifier | `com.skon.inputmethod.SkonsKeyboard` |
 | Connection name | `com.skon.inputmethod.SkonsKeyboard_Connection` |
 | Korean mode | ID `com.skon.inputmethod.SkonsKeyboard.Korean`, name "Sebeolsik Final", menu bar icon "한" |
 | English mode | ID `com.skon.inputmethod.SkonsKeyboard.English`, name "QWERTY", menu bar icon "A" |
-| Install location | `~/Library/Input Methods/` (current user only) |
+| Install location | `/Library/Input Methods/` (all users) |
+
+The display name always starts with a lowercase "skon".
 
 macOS launches an input method only if its bundle identifier contains
 `.inputmethod.`, and expects the connection name to be the bundle identifier
 followed by `_Connection`.
 
-The input method is built from source and installed with a single command,
-described in README.md.
+Distribution and installation are specified in §8.
 
 ### 2.4 Resource and privacy constraints
 
@@ -302,9 +306,44 @@ flowchart TD
     B -- no --> P
 ```
 
-Space during a composition is inserted by the input method, not passed
-through, because some terminals drop a passed-through key that ends a
-composition (§7.4).
+Space during a composition is inserted by the input method together with
+the commit, as the macOS built-in Korean input method does. In Terminal and
+Ghostty, Return and Escape follow §4.5 when its conditions hold.
+
+### 4.5 Return and Escape in terminals
+
+Terminal and Ghostty may drop a passed-through key that ends a composition
+(§7.4 L1). When all of the following hold, Return and Escape are handled as
+described here instead of as in §4.4:
+
+- the client is Terminal (`com.apple.Terminal`) or Ghostty
+  (`com.mitchellh.ghostty`),
+- the input method has the Accessibility permission,
+- the key is Return or Escape, with none of Shift, Control, Option, Command
+  and Function held, and
+- a composition exists.
+
+The input method then commits the composition, consumes the key event, and
+posts the same key again (key down and key up). It marks the events it posts,
+and passes a marked event through without any other handling when it arrives.
+Without the Accessibility permission, §4.4 applies.
+
+```mermaid
+sequenceDiagram
+    participant M as macOS
+    participant I as Input method
+    participant T as Terminal
+    Note over I: Composing 한
+    M->>I: Key down Return
+    I->>T: Commit 한
+    I-->>M: Consume, then post Return (marked)
+    M->>I: Key down Return (marked)
+    I-->>M: Pass through
+    M->>T: Return
+```
+
+The input method only checks whether it has the permission and never asks
+for it. The permission is set up during installation (§8.2).
 
 ## 5. English Mode
 
@@ -357,11 +396,14 @@ guaranteed applications.
 5. Control characters (U+0000–U+001F, U+007F) are never inserted as text.
 6. The input method handles key down events only. Mouse events and modifier
    key changes are never consumed.
+7. The input method posts key events only as specified in §4.5.
 
 ### 7.3 Acceptance scenarios
 
 Keys are QWERTY legends. Each scenario starts in an empty text field. In
-terminals, the limitations in §7.4 apply to A2, A5, A10 and A11.
+terminals, A2 and A10 pass in one key press only when the input method has the
+Accessibility permission (§4.5). Otherwise, and for A5 and A11, the
+limitations in §7.4 apply.
 
 | # | Steps | Expected result |
 |---|---|---|
@@ -383,8 +425,9 @@ terminals, the limitations in §7.4 apply to A2, A5, A10 and A11.
 
 | # | Applications | Limitation |
 |---|---|---|
-| L1 | Terminal, Ghostty | When a passed-through key ends a composition, the terminal may keep the committed text but drop the key, so the key must be pressed again. This is reported for Return and Escape in both terminals, and for Tab and arrow keys in Ghostty, where version 1.3.1 may instead lose the committed text. The macOS built-in Korean input method has the same problem. Discussion: `doc/DEVELOPMENT/terminal-commit-keys.md`. |
+| L1 | Terminal, Ghostty | When a passed-through key ends a composition, the terminal may keep the committed text but drop the key, so the key must be pressed again. This is reported for Return and Escape in both terminals, and for Tab and arrow keys in Ghostty, where version 1.3.1 may instead lose the committed text. The macOS built-in Korean input method has the same problem. With the Accessibility permission, §4.5 avoids it for Return and Escape. |
 | L2 | All | In password fields, macOS allows only ASCII-capable input sources, so Korean mode is not available there. |
+| L3 | Terminal, Ghostty | With §4.5, a key typed before the posted Return or Escape arrives may be processed ahead of it. |
 
 ### 7.5 Verification
 
@@ -393,9 +436,83 @@ terminals, the limitations in §7.4 apply to A2, A5, A10 and A11.
 - The scenarios in §7.3 are verified by hand in every guaranteed application
   whenever a change affects key handling or text output.
 
-## 8. Project Documents and Process
+## 8. Distribution and Installation
 
-### 8.1 Documents
+### 8.1 Installer
+
+- The input method is distributed as a signed installer package (`.pkg`).
+  Installing it does not need the source code or a Rust toolchain.
+- The package installs `SkonsKeyboard.app` into `/Library/Input Methods/` for
+  all users. macOS asks for an administrator password.
+- After copying the bundle, the installer:
+  1. quits a running older instance of the input method,
+  2. registers the input method and enables both modes for the user who
+     installs it,
+  3. sets up the Accessibility permission if the user chose it (§8.2).
+- The installer's last page explains how to select the input method, and
+  that logging out and in may be needed after the first installation.
+
+```mermaid
+flowchart TD
+    O["Open the installer package"] --> A["Choose whether to set up<br/>the Accessibility permission"]
+    A --> C["Copy SkonsKeyboard.app to<br/>/Library/Input Methods/"]
+    C --> Q["Quit a running older instance"]
+    Q --> R["Register the input method<br/>and enable both modes"]
+    R --> P{"Permission chosen?"}
+    P -- yes --> S["Start the input method in<br/>permission request mode"]
+    P -- no --> E["Show how to select the input method"]
+    S --> E
+```
+
+### 8.2 Accessibility permission
+
+- The installer shows an optional item, not selected by default, to set up
+  the Accessibility permission used by §4.5.
+- If the item is selected, the installer starts the input method once in a
+  permission request mode, in the installing user's session. macOS then asks
+  the user to allow the input method, not the installer, to use
+  Accessibility.
+- Because the app is signed with Developer ID (§8.4), a granted permission
+  stays granted when the input method is updated.
+
+### 8.3 Uninstaller
+
+- A separate uninstaller package SHOULD be provided. It has lower priority
+  than the installer.
+- The uninstaller disables the input sources, quits the input method, deletes
+  `/Library/Input Methods/SkonsKeyboard.app`, and resets the input method's
+  Accessibility permission record.
+
+### 8.4 Signing and notarization
+
+- The app is signed with a Developer ID Application certificate, with the
+  hardened runtime and a secure timestamp.
+- The packages are signed with a Developer ID Installer certificate, notarized
+  by Apple, and stapled, so that macOS opens them without a warning after they
+  are downloaded.
+- Notarization uses the notarytool keychain profile `skon's Universe`.
+- A package signed with an expired Developer ID Installer certificate must be
+  re-signed before it can be installed. Installed apps keep running after the
+  certificate expires.
+
+### 8.5 Building the packages
+
+- One command, run from the repository, builds the app and the packages,
+  signs them, and notarizes them. The command is written in Rust as part of
+  the Cargo workspace (§2.2) and is described in README.md.
+
+### 8.6 Verification
+
+- For each package, `spctl --assess --type install -vv` reports `accepted`
+  with the source `Notarized Developer ID`, and `xcrun stapler validate`
+  succeeds.
+- After installation on a Mac where the input method was not installed, both
+  modes can be selected (after logging out and in if needed), and the
+  scenarios in §7.3 pass.
+
+## 9. Project Documents and Process
+
+### 9.1 Documents
 
 | Path | Role | Language |
 |---|---|---|
@@ -408,27 +525,31 @@ terminals, the limitations in §7.4 apply to A2, A5, A10 and A11.
 | `doc/ARCHITECTURE/` | Supplementary files of `doc/ARCHITECTURE.md`. | Korean |
 | `doc/DEVELOPMENT/` | Open discussion items, one file per item. | Korean |
 
+Documents under `doc/` are written in Korean unless there is a specific
+reason to use another language.
+
 If any document or source code conflicts with this specification, the
 specification is correct and the other MUST be fixed.
 
-### 8.2 Spec requests
+### 9.2 Spec requests
 
 - A spec request is a file `spec/requests/NNN-Title.md`, where `NNN` is a
   three-digit sequence number starting at `000` (for example,
   `000-Project.md`).
 - This specification changes only by applying spec requests.
 
-### 8.3 Work branches
+### 9.3 Work branches
 
-- Requests are applied on a work branch named `spec/NNN-title` (for example,
-  `spec/000-project`). No work is done directly on `main` or `develop`.
+- A request is applied on the branch where the request file is committed.
+  That branch is the work branch.
+- The work branch MUST NOT be `main` or `develop`. If a request is committed
+  on one of them, that is a problem that needs the user's decision (§9.4).
 
-### 8.4 Applying a request
+### 9.4 Applying a request
 
 ```mermaid
 flowchart TD
-    R["spec/requests/NNN-Title.md"] --> W["Work branch spec/NNN-title"]
-    W --> S["Update spec/STANDARD.md"]
+    R["spec/requests/NNN-Title.md<br/>committed on the work branch"] --> S["Update spec/STANDARD.md"]
     S --> C["Create or modify source code<br/>to match the specification"]
     C --> D["Update README.md and<br/>doc/ARCHITECTURE.md if affected"]
     D --> M["Move the request to spec/merged/"]
@@ -444,7 +565,7 @@ flowchart TD
 5. If no problem occurred, commit on the work branch automatically. A problem
    is a failed build or test, or a question that needs the user's decision.
 
-### 8.5 Discussion items
+### 9.5 Discussion items
 
 - A question that needs discussion during development is recorded as one
   file in `doc/DEVELOPMENT/`.
