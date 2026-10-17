@@ -1,0 +1,17 @@
+#!/bin/sh
+# Runs as root and removes the input method (spec/STANDARD.md §8.3).
+app="/Library/Input Methods/skonsKeyboard.app"
+id="com.skon.inputmethod.skonsKeyboard"
+user=$(stat -f %Su /dev/console)
+
+if [ "$user" != "root" ] && [ -x "$app/Contents/MacOS/skonsKeyboard" ]; then
+    launchctl asuser "$(id -u "$user")" sudo -u "$user" "$app/Contents/MacOS/skonsKeyboard" --unregister
+fi
+pkill -x skonsKeyboard
+rm -rf "$app"
+tccutil reset Accessibility "$id"
+tccutil reset PostEvent "$id"
+for receipt in "$id.pkg" "$id.accessibility"; do
+    pkgutil --forget "$receipt" >/dev/null 2>&1
+done
+exit 0

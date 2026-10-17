@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="2">
+    <title>skon's Keyboard</title>
+    <conclusion file="conclusion.html" mime-type="text/html"/>
+    <options customize="always" require-scripts="false" hostArchitectures="arm64"/>
+    <domains enable_localSystem="true" enable_currentUserHome="false" enable_anywhere="false"/>
+    <volume-check>
+        <allowed-os-versions>
+            <os-version min="26.0"/>
+        </allowed-os-versions>
+    </volume-check>
+    <choices-outline>
+        <line choice="app"/>
+        <line choice="accessibility"/>
+    </choices-outline>
+    <choice id="app" title="skon's Keyboard"
+            description="입력기를 /Library/Input Methods에 설치합니다."
+            start_selected="true" start_enabled="false">
+        <pkg-ref id="com.skon.inputmethod.skonsKeyboard.pkg"/>
+    </choice>
+    <choice id="accessibility" title="터미널 Return/Esc 보정 (손쉬운 사용 권한)"
+            description="Terminal과 Ghostty에서 한글을 조합하다 누른 Return과 Esc가 한 번에 동작하게 합니다. 설치가 끝나면 손쉬운 사용 권한을 묻는 창이 뜹니다."
+            start_selected="false">
+        <pkg-ref id="com.skon.inputmethod.skonsKeyboard.accessibility"/>
+    </choice>
+    <pkg-ref id="com.skon.inputmethod.skonsKeyboard.pkg" version="@VERSION@" onConclusion="none">app.pkg</pkg-ref>
+    <pkg-ref id="com.skon.inputmethod.skonsKeyboard.accessibility" version="@VERSION@" onConclusion="none">accessibility.pkg</pkg-ref>
+</installer-gui-script>
