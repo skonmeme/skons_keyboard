@@ -12,7 +12,8 @@ use objc2_input_method_kit::{IMKInputController, IMKServer};
 
 use super::client::Client;
 use super::{
-    KEYBOARD_LAYOUT, TERMINALS, current_mode, mode_from_id, mode_id, set_current_mode, system,
+    GHOSTTY, KEYBOARD_LAYOUT, TERMINALS, current_mode, mode_from_id, mode_id, set_current_mode,
+    system,
 };
 use crate::engine::{ClientCall, Engine, Environment, KeyDown, Mode, Modifiers, keycode};
 
@@ -112,16 +113,20 @@ define_class!(
     unsafe impl NSObjectProtocol for InputController {}
 );
 
-/// Facts for §4.5, gathered before the engine runs so that no client call
-/// happens while the engine is borrowed.
+/// Facts for §3 and §4.5, gathered before the engine runs so that no client
+/// call happens while the engine is borrowed.
 struct Facts {
     terminal: bool,
+    ghostty: bool,
     can_post_events: bool,
 }
 
 impl Environment for Facts {
     fn is_terminal(&self) -> bool {
         self.terminal
+    }
+    fn is_ghostty(&self) -> bool {
+        self.ghostty
     }
     fn can_post_events(&self) -> bool {
         self.can_post_events
@@ -139,20 +144,21 @@ impl InputController {
         }
         let key = key_down(event);
         let ivars = self.ivars();
-        let facts = if (key.code == keycode::RETURN || key.code == keycode::ESCAPE)
-            && ivars.engine.borrow().is_composing()
-        {
-            Facts {
-                terminal: client
-                    .bundle_identifier()
-                    .is_some_and(|id| TERMINALS.contains(&id.as_str())),
-                can_post_events: system::can_post_events(),
-            }
+        // Ask the client only for keys where §3 or §4.5 can apply.
+        let commit_key = (key.code == keycode::RETURN || key.code == keycode::ESCAPE)
+            && ivars.engine.borrow().is_composing();
+        let shift_space = key.code == keycode::SPACE && key.modifiers.shift;
+        let client_id = if commit_key || shift_space {
+            client.bundle_identifier()
         } else {
-            Facts {
-                terminal: false,
-                can_post_events: false,
-            }
+            None
+        };
+        let facts = Facts {
+            terminal: client_id
+                .as_deref()
+                .is_some_and(|id| TERMINALS.contains(&id)),
+            ghostty: client_id.as_deref() == Some(GHOSTTY),
+            can_post_events: commit_key && system::can_post_events(),
         };
 
         ivars.in_key_event.set(true);

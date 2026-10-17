@@ -51,11 +51,13 @@ pub struct KeyDown {
     pub repeat: bool,
 }
 
-/// Facts about the client and the system that §4.5 needs. They are asked
-/// only when §4.5 could apply.
+/// Facts about the client and the system that §3 and §4.5 need. They are
+/// asked only when those rules could apply.
 pub trait Environment {
     /// The client is Terminal or Ghostty.
     fn is_terminal(&self) -> bool;
+    /// The client is Ghostty.
+    fn is_ghostty(&self) -> bool;
     /// The input method has the Accessibility permission.
     fn can_post_events(&self) -> bool;
 }
@@ -109,12 +111,17 @@ impl Engine {
     pub fn key_down(&mut self, key: KeyDown, env: &impl Environment) -> Response {
         let mods = key.modifiers;
 
-        // §3: Shift+Space switches modes.
+        // §3: Shift+Space switches modes, but not again while auto-repeating.
         if key.code == keycode::SPACE && mods.shift && !mods.any_but_shift() {
-            if key.repeat {
-                return consume(Vec::new());
+            let mut calls = self.commit();
+            // Ghostty would send the key to the shell as a space unless text
+            // is inserted while it handles the key (§3).
+            if calls.is_empty() && env.is_ghostty() {
+                calls.push(ClientCall::Insert(String::new()));
             }
-            let calls = self.commit();
+            if key.repeat {
+                return consume(calls);
+            }
             self.mode = self.mode.other();
             return Response {
                 switch_to: Some(self.mode),
@@ -227,12 +234,16 @@ mod tests {
 
     struct Env {
         terminal: bool,
+        ghostty: bool,
         permission: bool,
     }
 
     impl Environment for Env {
         fn is_terminal(&self) -> bool {
             self.terminal
+        }
+        fn is_ghostty(&self) -> bool {
+            self.ghostty
         }
         fn can_post_events(&self) -> bool {
             self.permission
@@ -241,6 +252,13 @@ mod tests {
 
     const APP: Env = Env {
         terminal: false,
+        ghostty: false,
+        permission: false,
+    };
+
+    const GHOSTTY: Env = Env {
+        terminal: true,
+        ghostty: true,
         permission: false,
     };
 
@@ -320,6 +338,37 @@ mod tests {
         assert_eq!(engine.key_down(legend('m'), &APP), pass(Vec::new()));
         let back = engine.key_down(shifted(keycode::SPACE), &APP);
         assert_eq!(back.switch_to, Some(Mode::Korean));
+    }
+
+    #[test]
+    fn shift_space_in_ghostty_inserts_an_empty_string_without_composition() {
+        for mode in [Mode::Korean, Mode::English] {
+            let mut engine = Engine::new(mode);
+            assert_eq!(
+                engine.key_down(shifted(keycode::SPACE), &GHOSTTY),
+                Response {
+                    switch_to: Some(mode.other()),
+                    ..consume(vec![insert("")])
+                }
+            );
+        }
+        // The commit already inserts text.
+        let mut engine = composing_han();
+        assert_eq!(
+            engine.key_down(shifted(keycode::SPACE), &GHOSTTY),
+            Response {
+                switch_to: Some(Mode::English),
+                ..consume(vec![insert("한")])
+            }
+        );
+        // Auto-repeat does not switch, but still inserts the empty string.
+        let mut engine = Engine::new(Mode::Korean);
+        let repeat = KeyDown {
+            repeat: true,
+            ..shifted(keycode::SPACE)
+        };
+        assert_eq!(engine.key_down(repeat, &GHOSTTY), consume(vec![insert("")]));
+        assert_eq!(engine.mode(), Mode::Korean);
     }
 
     #[test]
@@ -452,6 +501,7 @@ mod tests {
     fn return_and_escape_are_posted_again_in_terminals_with_permission() {
         let terminal = Env {
             terminal: true,
+            ghostty: false,
             permission: true,
         };
         for code in [keycode::RETURN, keycode::ESCAPE] {
@@ -470,10 +520,12 @@ mod tests {
     fn return_is_passed_through_without_the_conditions_of_section_4_5() {
         let no_permission = Env {
             terminal: true,
+            ghostty: false,
             permission: false,
         };
         let not_terminal = Env {
             terminal: false,
+            ghostty: false,
             permission: true,
         };
         for env in [&no_permission, &not_terminal] {
@@ -486,6 +538,7 @@ mod tests {
         // Not composing.
         let terminal = Env {
             terminal: true,
+            ghostty: false,
             permission: true,
         };
         let mut engine = Engine::new(Mode::Korean);
