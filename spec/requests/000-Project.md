@@ -28,6 +28,8 @@ macOS 26 이상, Apple Silicon 전용
   - 소스코드를 받아 설치하는 방식이 아니라 별도의 설치본으로 설치
   - 가급적 제거(uninstall)도 가능하게 (우선순위는 낮음)
 - 설치할 때 손쉬운 사용 권한을 설정할지 선택 (터미널 Return/Esc 문제 해결용)
+- 설치본은 Apple Developer Program 계정(Developer ID)으로 서명하고 공증 받음
+- 설치 위치: 모든 사용자를 위한 위치
 
 # 개발 방식
 spec/STANDARD.md: 프로젝트에서 정한 모든 스펙을 적어둔 문서
