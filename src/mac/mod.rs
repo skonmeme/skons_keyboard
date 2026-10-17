@@ -27,8 +27,11 @@ pub const ENGLISH_MODE_ID: &str = "com.skon.inputmethod.skonsKeyboard.English";
 /// Keyboard layout for passed-through keys in both modes (§5).
 const KEYBOARD_LAYOUT: &str = "com.apple.keylayout.ABC";
 
+/// Ghostty, where Shift+Space also inserts an empty string (§3).
+const GHOSTTY: &str = "com.mitchellh.ghostty";
+
 /// Clients where §4.5 applies.
-const TERMINALS: [&str; 2] = ["com.apple.Terminal", "com.mitchellh.ghostty"];
+const TERMINALS: [&str; 2] = ["com.apple.Terminal", GHOSTTY];
 
 fn mode_id(mode: Mode) -> &'static str {
     match mode {
