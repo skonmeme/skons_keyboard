@@ -2,7 +2,7 @@ Ghostty에서 한영 전환(Shift+Space)을 하면 공백이 같이 들어가는
 
 # 현상
 - Ghostty에서 조합 중인 글자가 없을 때 Shift+Space를 누르면, 모드는 바뀌지만 공백도 함께 입력됨
-- Zed 등 다른 앱에서는 이런 현상이 없음
+- 다음 앱에서는 이런 현상이 없음: Zed, Spotlight, Firefox, Safari, 기본 터미널, Slack, Apple Mail, Apple Messages
 
 # 원인
 - Ghostty는 입력기가 키를 소비했다는 응답을 보지 않고, 키 처리 전후의 상태로 판단함
