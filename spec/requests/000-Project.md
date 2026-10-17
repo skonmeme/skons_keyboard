@@ -4,6 +4,7 @@
 
 # 이름
 skon's Keyboard (skon은 소문자)
+- 번들 파일명과 ID는 skonsKeyboard (예: skonsKeyboard.app, com.skon.inputmethod.skonsKeyboard)
 
 # 대상 환경
 macOS 26 이상, Apple Silicon 전용

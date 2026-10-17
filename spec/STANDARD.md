@@ -66,11 +66,11 @@ macOS versions and Intel Macs are not supported.
 | Item | Value |
 |---|---|
 | Display name | skon's Keyboard |
-| Bundle | `SkonsKeyboard.app` |
-| Bundle identifier | `com.skon.inputmethod.SkonsKeyboard` |
-| Connection name | `com.skon.inputmethod.SkonsKeyboard_Connection` |
-| Korean mode | ID `com.skon.inputmethod.SkonsKeyboard.Korean`, name "Sebeolsik Final", menu bar icon "한" |
-| English mode | ID `com.skon.inputmethod.SkonsKeyboard.English`, name "QWERTY", menu bar icon "A" |
+| Bundle | `skonsKeyboard.app` |
+| Bundle identifier | `com.skon.inputmethod.skonsKeyboard` |
+| Connection name | `com.skon.inputmethod.skonsKeyboard_Connection` |
+| Korean mode | ID `com.skon.inputmethod.skonsKeyboard.Korean`, name "Sebeolsik Final", menu bar icon "한" |
+| English mode | ID `com.skon.inputmethod.skonsKeyboard.English`, name "QWERTY", menu bar icon "A" |
 | Install location | `/Library/Input Methods/` (all users) |
 
 The display name always starts with a lowercase "skon".
@@ -442,7 +442,7 @@ limitations in §7.4 apply.
 
 - The input method is distributed as a signed installer package (`.pkg`).
   Installing it does not need the source code or a Rust toolchain.
-- The package installs `SkonsKeyboard.app` into `/Library/Input Methods/` for
+- The package installs `skonsKeyboard.app` into `/Library/Input Methods/` for
   all users. macOS asks for an administrator password.
 - After copying the bundle, the installer:
   1. quits a running older instance of the input method,
@@ -455,7 +455,7 @@ limitations in §7.4 apply.
 ```mermaid
 flowchart TD
     O["Open the installer package"] --> A["Choose whether to set up<br/>the Accessibility permission"]
-    A --> C["Copy SkonsKeyboard.app to<br/>/Library/Input Methods/"]
+    A --> C["Copy skonsKeyboard.app to<br/>/Library/Input Methods/"]
     C --> Q["Quit a running older instance"]
     Q --> R["Register the input method<br/>and enable both modes"]
     R --> P{"Permission chosen?"}
@@ -480,7 +480,7 @@ flowchart TD
 - A separate uninstaller package SHOULD be provided. It has lower priority
   than the installer.
 - The uninstaller disables the input sources, quits the input method, deletes
-  `/Library/Input Methods/SkonsKeyboard.app`, and resets the input method's
+  `/Library/Input Methods/skonsKeyboard.app`, and resets the input method's
   Accessibility permission record.
 
 ### 8.4 Signing and notarization
