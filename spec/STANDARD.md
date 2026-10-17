@@ -113,6 +113,12 @@ stateDiagram-v2
 - Switching MUST change the input source selected in the system, not only an
   internal state. Some terminals decide whether a key was consumed by
   checking whether the input source changed.
+- In Ghostty (`com.mitchellh.ghostty`), the input method also inserts an empty
+  string when Shift+Space is pressed with no composition. Ghostty decides
+  whether a key was consumed from what happened while it handled the key,
+  and the mode change reaches it only afterwards, so it would otherwise send
+  Shift+Space to the shell as a space. Ghostty treats a key during which text
+  was inserted as consumed, and sends nothing for an empty string.
 - Auto-repeated Shift+Space events (from holding the keys down) MUST be
   consumed without switching again.
 - When the system changes the mode (for example, the user selects it in the
@@ -276,7 +282,7 @@ The first row that matches a key down event applies.
 
 | Key event | While composing | While not composing |
 |---|---|---|
-| Shift+Space | Commit, switch to English mode, consume | Switch to English mode, consume |
+| Shift+Space | Commit, switch to English mode, consume | Switch to English mode, consume (in Ghostty, also insert an empty string; §3) |
 | Any key with Command, Control, Option or Function held | Commit, pass through | Pass through |
 | Backspace | Undo the last keystroke (§4.2), consume | Pass through |
 | Layout key that produces a jamo | Compose (§4.2), consume | Start a composition, consume |
@@ -367,7 +373,7 @@ Until this section specifies it, the input method has no voice input.
 | Category | Applications |
 |---|---|
 | Web browsers | Safari, Firefox, Google Chrome |
-| Editor | Zed |
+| Editors | Zed, Xcode |
 | Terminals | Terminal, Ghostty |
 | Messengers | Slack, Messages |
 | Email | Mail |
@@ -392,7 +398,7 @@ guaranteed applications.
 4. Committing is idempotent: each composition is committed at most once, even
    when the system asks for a commit late, repeatedly, or in the middle of
    another call. When nothing changes, the input method makes no call to the
-   client.
+   client. The only exception is the empty string inserted in Ghostty (§3).
 5. Control characters (U+0000–U+001F, U+007F) are never inserted as text.
 6. The input method handles key down events only. Mouse events and modifier
    key changes are never consumed.
@@ -428,6 +434,7 @@ limitations in §7.4 apply.
 | L1 | Terminal, Ghostty | When a passed-through key ends a composition, the terminal may keep the committed text but drop the key, so the key must be pressed again. This is reported for Return and Escape in both terminals, and for Tab and arrow keys in Ghostty, where version 1.3.1 may instead lose the committed text. The macOS built-in Korean input method has the same problem. With the Accessibility permission, §4.5 avoids it for Return and Escape. |
 | L2 | All | In password fields, macOS allows only ASCII-capable input sources, so Korean mode is not available there. |
 | L3 | Terminal, Ghostty | With §4.5, a key typed before the posted Return or Escape arrives may be processed ahead of it. |
+| L4 | Ghostty | A program that enables the kitty keyboard protocol still receives Shift+Space as a key event (for example `CSI 32;2u`), because Ghostty encodes the key itself when no text comes with it. What happens then depends on the program. |
 
 ### 7.5 Verification
 
