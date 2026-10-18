@@ -46,7 +46,8 @@ flowchart LR
 | `src/main.rs` | 실행 파일. 인자가 없으면 입력기로 동작하고, 설치 스크립트용 보조 명령이 있습니다. |
 | `resources/` | `Info.plist`, 모드 이름(`en.lproj/InfoPlist.strings`), 메뉴 막대 아이콘. |
 | `packaging/` | 설치본과 제거본의 화면 정의, 설치 스크립트, 안내 페이지. |
-| `xtask/` | 설치본을 만드는 명령 `cargo xtask package`(§8.5). |
+| `xtask/` | 설치본을 만드는 명령 `cargo xtask package`(§8.5)와 릴리즈용 명령 `release-check`, `release-notes`(§8.7). |
+| `.github/workflows/release.yml` | develop이 main에 병합되면 릴리즈하는 GitHub Actions 워크플로(§8.7). |
 
 ## 3. 키 하나가 처리되는 과정
 
@@ -180,7 +181,28 @@ flowchart TD
 - Developer ID로 서명하면 업데이트해도 서명 신원이 같아서, 손쉬운 사용 권한이 유지됩니다.
 - 지금 쓰는 두 Developer ID 인증서는 2027-02-01에 만료됩니다. 만료된 Installer 인증서로 서명한 설치본은 다시 서명해야 설치할 수 있으므로, 그 전에 Xcode에서 인증서를 새로 만듭니다.
 
-## 10. 테스트
+## 10. 릴리즈
+
+develop이 main에 병합되면 `.github/workflows/release.yml`이 GitHub의 `macos-26` 실행기(Apple Silicon, Xcode 26)에서 돕니다(§8.7).
+
+```mermaid
+flowchart TD
+    A["main에 push (develop 병합)"] --> B["cargo xtask release-check<br/>같은 버전 태그가 있으면 실패"]
+    B --> C["cargo test"]
+    C --> D["임시 키체인에 인증서를 넣고<br/>공증 키를 skon's Universe 프로필로 저장"]
+    D --> E["cargo xtask package<br/>(NOTARY_KEYCHAIN = 임시 키체인)"]
+    E --> F["cargo xtask release-notes"]
+    F --> G["gh release create<br/>설치본과 제거본 첨부"]
+    G --> H["임시 키체인 삭제 (실패해도 항상)"]
+```
+
+- 버전은 `Cargo.toml`의 작업 공간 버전입니다. xtask도 같은 값을 쓰므로 `cargo xtask release-check`가 그 버전을 출력하고, 태그 `v<버전>`이 이미 있으면 실패합니다.
+- 릴리즈 노트는 이전 릴리즈 태그(`v*` 중 가장 높은 버전) 이후 `spec/merged/`에 새로 생긴 파일 목록입니다. 요청서를 옮긴 것이 이름 바꾸기로 잡히지 않도록 `--no-renames`로 비교합니다.
+- 인증서와 공증 키는 저장소 Secrets에서 와서 실행기의 임시 키체인에만 들어갑니다. 서명 도구가 암호를 묻지 않도록 키의 접근 목록을 설정합니다.
+- `cargo xtask package`는 `NOTARY_KEYCHAIN`이 있으면 그 키체인에서 공증 프로필을 찾습니다. 이 Mac에서는 지금처럼 로그인 키체인을 씁니다.
+- Developer ID 인증서의 중간 인증서(G1, G2)를 Apple에서 받아 함께 넣습니다. 지금 인증서를 발급한 G1은 2027-02-01에 만료되므로, 그 전에 새로 만드는 인증서는 G2에서 발급됩니다.
+
+## 11. 테스트
 
 - `cargo test`: 앱 없이 도는 테스트입니다.
   - 배열표, 조합 규칙, 스펙 예시(§4.2)
@@ -188,7 +210,7 @@ flowchart TD
   - 스펙 문서와 코드의 표 비교, `Info.plist`와 코드의 식별자 비교
 - 앱별 동작은 설치한 뒤 §7.3의 인수 시나리오를 보장 대상 앱마다 손으로 확인합니다.
 
-## 11. 참고 자료
+## 12. 참고 자료
 
 - InputMethodKit Rust 바인딩: https://docs.rs/objc2-input-method-kit
 - Ghostty의 입력기 처리: https://github.com/ghostty-org/ghostty/blob/main/macos/Sources/Ghostty/Surface%20View/SurfaceView_AppKit.swift
