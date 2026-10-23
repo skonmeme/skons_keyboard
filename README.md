@@ -50,6 +50,23 @@ cargo xtask package
 
 `target/package/`에 서명하고 공증받은 설치본과 제거본이 만들어집니다. 동작 방식은 [doc/ARCHITECTURE.md](doc/ARCHITECTURE.md)에 있습니다.
 
+## 릴리즈 (개발자용)
+
+develop을 main에 병합하면 GitHub Actions가 설치본과 제거본을 만들어 GitHub Releases에 올립니다.
+
+- 병합하기 전에 `Cargo.toml`의 버전을 올립니다. 같은 버전의 태그가 이미 있으면 릴리즈하지 않습니다.
+- 릴리즈 노트에는 지난 릴리즈 이후 반영된 명세 요청서가 나열됩니다.
+
+처음 한 번, GitHub 저장소의 Settings > Secrets and variables > Actions에 다음을 등록합니다.
+
+1. 키체인 접근에서 "Developer ID Application"과 "Developer ID Installer" 인증서를 함께 선택하고, 파일 > 항목 내보내기…로 `.p12` 파일 하나에 저장합니다. 이때 암호를 정합니다.
+2. `base64 -i developer-id.p12 | pbcopy`로 복사해 `DEVELOPER_ID_P12`에 넣습니다.
+3. 정한 암호를 `DEVELOPER_ID_P12_PASSWORD`에 넣습니다.
+4. App Store Connect API 키 파일(`AuthKey_….p8`)의 내용을 `NOTARY_KEY`에 넣습니다. `pbcopy < AuthKey_….p8`로 복사할 수 있습니다.
+5. 그 키의 Key ID를 `NOTARY_KEY_ID`에, Issuer ID를 `NOTARY_ISSUER_ID`에 넣습니다.
+
+등록한 뒤에는 내보낸 `.p12` 파일을 지웁니다.
+
 ## 라이선스
 
 BSD 3-Clause. [LICENSE](LICENSE)를 봅니다.

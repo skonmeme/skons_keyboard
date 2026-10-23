@@ -37,6 +37,7 @@ with it, this document is correct and the other must be fixed (§9.1).
   - [8.4 Signing and notarization](#84-signing-and-notarization)
   - [8.5 Building the packages](#85-building-the-packages)
   - [8.6 Verification](#86-verification)
+  - [8.7 Release](#87-release)
 - [9. Project Documents and Process](#9-project-documents-and-process)
   - [9.1 Documents](#91-documents)
   - [9.2 Spec requests](#92-spec-requests)
@@ -61,7 +62,7 @@ features in this document and is designed to stay lightweight.
 | English input with the QWERTY layout | §5 |
 | Voice input for Korean and English speech | §6 (not yet specified) |
 | Guaranteed operation in a fixed list of applications | §7 |
-| Installation and removal with signed packages | §8 |
+| Signed installer packages and automatic releases | §8 |
 
 Out of scope: other Hangul layouts (2-set, 3-90, ...), Old Hangul, Hanja
 conversion, auto-correction or prediction, a settings UI or configuration
@@ -557,6 +558,49 @@ flowchart TD
   modes can be selected (after logging out and in if needed), and the
   scenarios in §7.3 pass.
 
+### 8.7 Release
+
+A release is made automatically when develop is merged into main (§9.3).
+
+```mermaid
+flowchart TD
+    M["develop merged into main"] --> V{"Tag for this version<br/>already exists?"}
+    V -- yes --> F["Fail, nothing is released"]
+    V -- no --> T["Run the automated tests"]
+    T --> P["Build, sign, notarize and verify<br/>the packages (§8.5)"]
+    P --> R["Create the tag and a GitHub release<br/>with both packages and release notes"]
+```
+
+- The release runs on GitHub Actions when commits are pushed to main, on a
+  GitHub-hosted Apple Silicon macOS runner whose Xcode has the macOS 26 SDK
+  or later.
+- The release:
+  1. reads the version from `Cargo.toml` and fails if the tag `v<version>`
+     already exists;
+  2. runs the automated tests (§7.5);
+  3. builds, signs, notarizes and verifies the packages with the command of
+     §8.5;
+  4. creates the tag `v<version>` and a GitHub release named
+     "skon's Keyboard <version>", with both packages attached.
+- The release notes list the spec requests added to `spec/merged/` since the
+  previous release tag, one line each with the file name and the first line
+  of the request. The first release lists all of them.
+- If any step fails, no tag and no release are created.
+
+The signing certificates and the notary key are stored as repository secrets:
+
+| Repository secret | Content |
+|---|---|
+| `DEVELOPER_ID_P12` | The Developer ID Application and Developer ID Installer certificates with their private keys, exported together as one `.p12` file and base64-encoded |
+| `DEVELOPER_ID_P12_PASSWORD` | The password of that `.p12` file |
+| `NOTARY_KEY` | The contents of the App Store Connect API key file (`.p8`) |
+| `NOTARY_KEY_ID` | The key ID of that API key |
+| `NOTARY_ISSUER_ID` | The issuer ID of that API key |
+
+The runner imports the certificates into a temporary keychain and stores the
+API key there as the notarytool profile of §8.4, so that the command of §8.5
+works unchanged. The keychain is deleted when the release ends.
+
 ## 9. Project Documents and Process
 
 ### 9.1 Documents
@@ -591,6 +635,8 @@ specification is correct and the other MUST be fixed.
   That branch is the work branch.
 - The work branch MUST NOT be `main` or `develop`. If a request is committed
   on one of them, that is a problem that needs the user's decision (§9.4).
+- Merging develop into main makes a release (§8.7). The version in
+  `Cargo.toml` MUST be raised before develop is merged into main.
 
 ### 9.4 Applying a request
 

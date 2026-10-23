@@ -1,10 +1,14 @@
-//! Builds the signed and notarized installer and uninstaller packages (§8.5):
+//! Release tooling (§8.5, §8.7):
 //!
 //! ```text
-//! cargo xtask package
+//! cargo xtask package        # signed and notarized packages in target/package/
+//! cargo xtask release-check  # prints the version; fails if its tag exists
+//! cargo xtask release-notes  # prints the release notes
 //! ```
 //!
-//! The packages are written to `target/package/`.
+//! `package` reads the notary profile from the login keychain, or from the
+//! keychain file named by `NOTARY_KEYCHAIN` when it is set, as in the
+//! release workflow.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -19,7 +23,9 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 fn main() -> ExitCode {
     let result = match std::env::args().nth(1).as_deref() {
         Some("package") => package(),
-        _ => Err("usage: cargo xtask package".into()),
+        Some("release-check") => release_check(),
+        Some("release-notes") => release_notes(),
+        _ => Err("usage: cargo xtask package | release-check | release-notes".into()),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -185,10 +191,16 @@ fn package() -> Result {
 
     // 6. Notarize, staple, and verify (§8.4, §8.6).
     for (_, package) in &packages {
-        let submitted = run(Command::new("xcrun")
-            .args(["notarytool", "submit"])
-            .arg(package)
-            .args(["--keychain-profile", NOTARY_PROFILE, "--wait"]))?;
+        let mut submit = Command::new("xcrun");
+        submit.args(["notarytool", "submit"]).arg(package).args([
+            "--keychain-profile",
+            NOTARY_PROFILE,
+            "--wait",
+        ]);
+        if let Some(keychain) = std::env::var_os("NOTARY_KEYCHAIN") {
+            submit.arg("--keychain").arg(keychain);
+        }
+        let submitted = run(&mut submit)?;
         if !submitted.contains("status: Accepted") {
             return Err(format!(
                 "notarization of {} was not accepted:\n{submitted}",
@@ -214,6 +226,65 @@ fn package() -> Result {
 
     for (_, package) in &packages {
         println!("built {}", package.display());
+    }
+    Ok(())
+}
+
+/// Runs git in the workspace root and returns its standard output.
+fn git(args: &[&str]) -> Result<String> {
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(root())
+        .output()
+        .map_err(|e| format!("git: {e}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "git {} failed:\n{}",
+            args.join(" "),
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+/// Prints the version, or fails if its tag already exists (§8.7).
+fn release_check() -> Result {
+    let tag = format!("v{VERSION}");
+    if !git(&["tag", "--list", &tag])?.trim().is_empty() {
+        return Err(format!(
+            "tag {tag} already exists; raise the version in Cargo.toml (§9.3)"
+        ));
+    }
+    println!("{VERSION}");
+    Ok(())
+}
+
+/// Prints the release notes: the spec requests added to `spec/merged/`
+/// since the previous release tag, or all of them for the first release
+/// (§8.7).
+fn release_notes() -> Result {
+    let tag = format!("v{VERSION}");
+    let tags = git(&["tag", "--list", "v*", "--sort=-version:refname"])?;
+    let files = match tags.lines().find(|t| *t != tag) {
+        Some(previous) => git(&[
+            "diff",
+            "--name-only",
+            "--no-renames",
+            "--diff-filter=A",
+            &format!("{previous}..HEAD"),
+            "--",
+            "spec/merged/",
+        ])?,
+        None => git(&["ls-files", "spec/merged/"])?,
+    };
+    let mut files: Vec<&str> = files.lines().collect();
+    files.sort();
+    println!("이번 릴리즈에 반영된 명세 요청서:\n");
+    for file in files {
+        let path = root().join(file);
+        let text = fs::read_to_string(&path).map_err(|e| format!("read {file}: {e}"))?;
+        let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or(file);
+        println!("- {name}: {}", text.lines().next().unwrap_or("").trim());
     }
     Ok(())
 }
