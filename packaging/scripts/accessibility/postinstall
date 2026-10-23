@@ -1,0 +1,11 @@
+#!/bin/sh
+# Runs as root when the Accessibility item is selected (spec/STANDARD.md §8.2).
+app="/Library/Input Methods/skonsKeyboard.app"
+user=$(stat -f %Su /dev/console)
+
+# Start through Launch Services in the user's session, so that macOS asks to
+# allow the input method, not the installer.
+if [ "$user" != "root" ]; then
+    launchctl asuser "$(id -u "$user")" sudo -u "$user" open -a "$app" --args --request-accessibility
+fi
+exit 0

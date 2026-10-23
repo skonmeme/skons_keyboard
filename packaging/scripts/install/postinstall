@@ -1,0 +1,13 @@
+#!/bin/sh
+# Runs as root after the bundle is copied (spec/STANDARD.md §8.1).
+app="/Library/Input Methods/skonsKeyboard.app"
+user=$(stat -f %Su /dev/console)
+
+# Quit a running older instance. macOS starts the new one when it is needed.
+pkill -x skonsKeyboard
+
+# Register the input method and enable both modes for the installing user.
+if [ "$user" != "root" ]; then
+    launchctl asuser "$(id -u "$user")" sudo -u "$user" "$app/Contents/MacOS/skonsKeyboard" --register
+fi
+exit 0

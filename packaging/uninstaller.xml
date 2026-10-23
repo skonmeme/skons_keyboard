@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="2">
+    <title>skon's Keyboard 제거</title>
+    <welcome file="uninstall-welcome.html" mime-type="text/html"/>
+    <conclusion file="uninstall-conclusion.html" mime-type="text/html"/>
+    <options customize="never" require-scripts="false" hostArchitectures="arm64"/>
+    <domains enable_localSystem="true" enable_currentUserHome="false" enable_anywhere="false"/>
+    <choices-outline>
+        <line choice="uninstall"/>
+    </choices-outline>
+    <choice id="uninstall" title="skon's Keyboard 제거">
+        <pkg-ref id="com.skon.inputmethod.skonsKeyboard.uninstall"/>
+    </choice>
+    <pkg-ref id="com.skon.inputmethod.skonsKeyboard.uninstall" version="@VERSION@" onConclusion="none">uninstall.pkg</pkg-ref>
+</installer-gui-script>
