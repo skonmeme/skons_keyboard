@@ -38,8 +38,9 @@ CLAUDE.md를 읽을 때, 유일한 스펙 문서인 STANDARD.md를 읽을 수 �
   - 명세 요청서는 사용자의 말투(한글, 짧은 항목)로 쓰고 사용자가 쓴 문구를 살림
 
 # 명세서 수정 방향
-- 머리말과 §9.1의 STANDARD.md 역할: 그대로 두고, 그림 규칙만 논의사항 2에 따라 고침
+- 머리말과 §9.1의 STANDARD.md 역할: 그대로 둠
 - §9.1: 문서 표에 CLAUDE.md 추가 (Claude가 읽는 지침. STANDARD.md를 가리킴. 영어로만 작성)
+- §9.1: 그림은 Mermaid를 기본으로 본문에 넣고, Mermaid로 못 그리는 그림만 SVG 파일로 spec/STANDARD/에 둠
 - §9.2 명세 요청서
   - 첫 줄은 요청을 한 줄로 요약 (릴리즈 노트에 쓰임)
   - 이어서 사용자의 요청, 현재 파악된 상태, 명세서 수정 방향, 논의사항, 기타 연관된 문서
@@ -55,7 +56,7 @@ CLAUDE.md를 읽을 때, 유일한 스펙 문서인 STANDARD.md를 읽을 수 �
 1. 개정 방법 1–4에 없는 규칙(작업 브랜치 §9.3, spec/merged로 이동과 마무리 commit §9.4)은 그대로 둘지
    - 결정: 제안대로. 그대로 두고 CLAUDE.md에서 STANDARD §9를 가리킴
 2. "SVG 그림 추가": Mermaid 그림을 SVG 파일로 바꾸는 것인지, SVG 그림도 쓸 수 있다는 것인지
-   - 미정: SVG 파일과 Mermaid의 장단점을 비교한 뒤 정함
+   - 결정: 지금 하던 대로 Mermaid를 기본으로 하고, 못 그리는 그림만 SVG로
 3. CLAUDE.md에 넣을 내용의 언어 (지금 CLAUDE.md는 영어)
    - 결정: CLAUDE.md도 영문으로만
 4. Claude 메모리에 있던 규칙(현재 파악된 상태)을 STANDARD §9나 CLAUDE.md에 넣을지
