@@ -7,9 +7,12 @@
 # 현재 파악된 상태
 - STANDARD §2.3에는 메뉴바 아이콘의 글자("한", "A")만 있고 색은 없음
 - 아이콘은 resources/korean.tiff, resources/english.tiff (16×16, 32×32). 투명 배경에 검은 글자
-- Info.plist에 TISIconIsTemplate이 켜져 있음. 이 설정대로면 macOS가 메뉴바 배경에 맞춰 색을 바꿈 (어두우면 흰색, 밝으면 검정). 실제 화면에서는 확인하지 않음
+- Info.plist에 TISIconIsTemplate이 켜져 있음. 이 설정대로면 macOS가 메뉴바 배경에 맞춰 색을 바꿈 (어두우면 흰색, 밝으면 검정)
+  - 실제 화면에서는 다른 아이콘이 흰색일 때 이 아이콘만 검은색 (사용자 확인). 템플릿 설정이 적용되지 않고 있음
   - 설치된 앱(0.1.1)도 같은 설정과 같은 아이콘
-  - macOS 기본 입력기(AinuIM, TamilIM)도 같은 자리(Info.plist 최상위)에 TISIconIsTemplate을 둠
+  - macOS 기본 입력기(AinuIM, TamilIM)도 같은 자리(Info.plist 최상위)에 TISIconIsTemplate을 둠. 아이콘 파일 형식(16×16·32×32 TIFF, RGB+알파)도 같음
+  - 다른 점: 우리는 두 모드에 tsInputModeAlternateMenuIconFileKey로 같은 검은 아이콘을 지정함. macOS 기본 입력기는 이 키를 두지 않음
+  - 원인은 아직 확인하지 않음
 - 버전은 Cargo.toml의 [workspace.package] version 한 곳에 있음 (지금 0.1.1, 태그 v0.1.1 있음). develop을 main에 머지하기 전에 버전을 올려야 함 (§9.3)
 
 # 명세서 수정 방향
