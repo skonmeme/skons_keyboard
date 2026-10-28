@@ -60,6 +60,22 @@ For multi-step tasks, state a brief plan:
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
+## 5. Follow the Specification
+
+**`spec/STANDARD.md` is the only specification. Read it before working on this project.**
+
+- No other document is a specification. When any document or the source code conflicts with `spec/STANDARD.md`, `spec/STANDARD.md` is correct.
+- `spec/STANDARD.md` is written in English only. Figures are Mermaid diagrams by default; a figure that Mermaid cannot draw is an SVG file in `spec/STANDARD/`.
+- Never keep requests or discussion in Claude's memory. They live only in the files listed in `spec/STANDARD.md` §9.1.
+
+To revise the specification, implement the source code and update other documents:
+1. Create a spec request in `spec/requests/`.
+2. Right before updating `spec/STANDARD.md`, commit the spec request automatically.
+3. Implement the related source code based on the revised `spec/STANDARD.md`.
+4. Update the related documents, such as README.md.
+
+Follow `spec/STANDARD.md` §9 for the details: what a request contains, work branches, when a request is applied, and discussion items.
+
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
