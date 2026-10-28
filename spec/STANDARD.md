@@ -120,6 +120,25 @@ The menu bar icons are template images: the menu bar draws them in the same
 color as its other icons, which follows the menu bar background (for
 example, white on a dark menu bar).
 
+Each menu bar icon is its letter with an underline below it. Both icons have
+the same layout, in pixels of the 32 × 32 image for Retina displays
+(16 × 16 points), from the top:
+
+| Part | Pixels |
+|---|---|
+| Margin | 2 |
+| Letter ("한" or "A") | 25 |
+| Gap | 2 |
+| Underline | 2 |
+| Margin | 1 |
+
+- The letter is centered horizontally. The underline is 28 pixels long,
+  longer than the letter, and also centered.
+- The 16 × 16 image for other displays is the 32 × 32 image drawn at half
+  the size.
+- The icons are drawn into `resources/` by the command `cargo xtask icons`,
+  which is part of the Cargo workspace like the command of §8.5.
+
 macOS launches an input method only if its bundle identifier contains
 `.inputmethod.`, and expects the connection name to be the bundle identifier
 followed by `_Connection`.
