@@ -50,6 +50,8 @@ cargo xtask package
 
 `target/package/`에 서명하고 공증받은 설치본과 제거본이 만들어집니다. 동작 방식은 [doc/ARCHITECTURE.md](doc/ARCHITECTURE.md)에 있습니다.
 
+메뉴 막대 아이콘을 바꿀 때는 `cargo xtask icons`로 `resources/`의 아이콘을 다시 그립니다.
+
 ## 릴리즈 (개발자용)
 
 develop을 main에 병합하면 GitHub Actions가 설치본과 제거본을 만들어 GitHub Releases에 올립니다.

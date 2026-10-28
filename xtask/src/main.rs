@@ -1,9 +1,10 @@
-//! Release tooling (§8.5, §8.7):
+//! Release tooling (§8.5, §8.7) and the menu bar icons (§2.3):
 //!
 //! ```text
 //! cargo xtask package        # signed and notarized packages in target/package/
 //! cargo xtask release-check  # prints the version; fails if its tag exists
 //! cargo xtask release-notes  # prints the release notes
+//! cargo xtask icons          # draws the menu bar icons into resources/
 //! ```
 //!
 //! `package` reads the notary profile from the login keychain, or from the
@@ -13,19 +14,34 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
+use std::ptr::{self, NonNull};
+
+use objc2::AnyThread;
+use objc2::rc::Retained;
+use objc2_app_kit::{NSBitmapImageRep, NSImageRep, NSTIFFCompression};
+use objc2_core_foundation::{CFString, CGPoint, CGRect, CGSize};
+use objc2_core_graphics::{
+    CGBitmapContextCreate, CGBitmapContextCreateImage, CGColorSpace, CGContext, CGGlyph,
+    CGImageAlphaInfo, CGPath, kCGColorSpaceSRGB,
+};
+use objc2_core_text::CTFont;
+use objc2_foundation::{NSArray, NSSize};
 
 const APP_IDENTITY: &str = "Developer ID Application";
 const INSTALLER_IDENTITY: &str = "Developer ID Installer";
 const NOTARY_PROFILE: &str = "skon's Universe";
 const BUNDLE_ID: &str = "com.skon.inputmethod.skonsKeyboard";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
+/// Font of the letters in the menu bar icons (§2.3).
+const ICON_FONT: &str = "AppleSDGothicNeo-SemiBold";
 
 fn main() -> ExitCode {
     let result = match std::env::args().nth(1).as_deref() {
         Some("package") => package(),
         Some("release-check") => release_check(),
         Some("release-notes") => release_notes(),
-        _ => Err("usage: cargo xtask package | release-check | release-notes".into()),
+        Some("icons") => icons(),
+        _ => Err("usage: cargo xtask package | release-check | release-notes | icons".into()),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -287,4 +303,78 @@ fn release_notes() -> Result {
         println!("- {name}: {}", text.lines().next().unwrap_or("").trim());
     }
     Ok(())
+}
+
+/// Draws the menu bar icons into `resources/` (§2.3).
+fn icons() -> Result {
+    for (letter, file) in [('한', "korean.tiff"), ('A', "english.tiff")] {
+        let small = icon(letter, 16)?;
+        let large = icon(letter, 32)?;
+        let reps: [&NSImageRep; 2] = [&small, &large];
+        let tiff = NSBitmapImageRep::TIFFRepresentationOfImageRepsInArray_usingCompression_factor(
+            &NSArray::from_slice(&reps),
+            NSTIFFCompression::LZW,
+            0.0,
+        )
+        .ok_or(format!("encode {file}"))?;
+        let path = root().join("resources").join(file);
+        fs::write(&path, tiff.to_vec()).map_err(|e| format!("write {}: {e}", path.display()))?;
+        println!("drew {}", path.display());
+    }
+    Ok(())
+}
+
+/// Draws one icon, `pixels` wide and high. The layout is in pixels of the
+/// 32 × 32 image; the 16 × 16 image is the same drawing at half the size.
+fn icon(letter: char, pixels: usize) -> Result<Retained<NSBitmapImageRep>> {
+    let space = CGColorSpace::with_name(Some(unsafe { kCGColorSpaceSRGB })).ok_or("sRGB")?;
+    let context = unsafe {
+        CGBitmapContextCreate(
+            ptr::null_mut(),
+            pixels,
+            pixels,
+            8,
+            0,
+            Some(&space),
+            CGImageAlphaInfo::PremultipliedLast.0,
+        )
+    }
+    .ok_or("bitmap context")?;
+    let c = Some(&*context);
+    let scale = pixels as f64 / 32.0;
+    CGContext::scale_ctm(c, scale, scale);
+    CGContext::set_rgb_fill_color(c, 0.0, 0.0, 0.0, 1.0);
+
+    // The letter: 25 pixels high, 2 pixels below the top edge, centered.
+    // y grows upwards, so its top is at y = 30.
+    let font = unsafe { CTFont::with_name(&CFString::from_str(ICON_FONT), 100.0, ptr::null()) };
+    let mut character = letter as u16; // both letters are one UTF-16 unit
+    let mut glyph: CGGlyph = 0;
+    let found = unsafe {
+        font.glyphs_for_characters(NonNull::from(&mut character), NonNull::from(&mut glyph), 1)
+    };
+    let outline = found
+        .then(|| unsafe { font.path_for_glyph(glyph, ptr::null()) })
+        .flatten()
+        .ok_or(format!("{ICON_FONT} has no outline for {letter}"))?;
+    let bounds = CGPath::path_bounding_box(Some(&outline));
+    let size = 25.0 / bounds.size.height;
+    CGContext::save_g_state(c);
+    CGContext::translate_ctm(
+        c,
+        16.0 - size * (bounds.origin.x + bounds.size.width / 2.0),
+        30.0 - size * (bounds.origin.y + bounds.size.height),
+    );
+    CGContext::scale_ctm(c, size, size);
+    CGContext::add_path(c, Some(&outline));
+    CGContext::fill_path(c);
+    CGContext::restore_g_state(c);
+
+    // The underline: 28 × 2 pixels, centered, 1 pixel above the bottom edge.
+    CGContext::fill_rect(c, CGRect::new(CGPoint::new(2.0, 1.0), CGSize::new(28.0, 2.0)));
+
+    let image = CGBitmapContextCreateImage(c).ok_or("bitmap image")?;
+    let rep = NSBitmapImageRep::initWithCGImage(NSBitmapImageRep::alloc(), &image);
+    rep.setSize(NSSize::new(16.0, 16.0));
+    Ok(rep)
 }

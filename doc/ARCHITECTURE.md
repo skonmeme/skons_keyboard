@@ -46,7 +46,7 @@ flowchart LR
 | `src/main.rs` | 실행 파일. 인자가 없으면 입력기로 동작하고, 설치 스크립트용 보조 명령이 있습니다. |
 | `resources/` | `Info.plist`, 모드 이름(`en.lproj/InfoPlist.strings`), 메뉴 막대 아이콘. |
 | `packaging/` | 설치본과 제거본의 화면 정의, 설치 스크립트, 안내 페이지. |
-| `xtask/` | 설치본을 만드는 명령 `cargo xtask package`(§8.5)와 릴리즈용 명령 `release-check`, `release-notes`(§8.7). |
+| `xtask/` | 설치본을 만드는 명령 `cargo xtask package`(§8.5), 릴리즈용 명령 `release-check`, `release-notes`(§8.7), 메뉴 막대 아이콘을 그리는 명령 `icons`(§2.3). |
 | `.github/workflows/release.yml` | develop이 main에 병합되면 릴리즈하는 GitHub Actions 워크플로(§8.7). |
 
 ## 3. 키 하나가 처리되는 과정
@@ -99,6 +99,7 @@ sequenceDiagram
 - 두 모드는 각각 별도의 입력 소스입니다(§3). Shift+Space는 시스템에서 선택된 입력 소스 자체를 바꿉니다(`selectInputMode`).
   - 그래서 메뉴 막대 아이콘이 바뀝니다.
   - 아이콘은 템플릿 이미지(`TISIconIsTemplate`)라서 macOS가 다른 메뉴 막대 아이콘과 같은 색으로 칠합니다(§2.3). macOS 기본 입력기처럼 보조 메뉴 아이콘(`tsInputModeAlternateMenuIconFileKey`)은 두지 않습니다(요청서 005).
+  - `cargo xtask icons`가 아이콘을 그립니다. 32×32 그림에서 Apple SD Gothic Neo SemiBold의 글자 윤곽을 높이 25픽셀로 맞춰 칠하고, 그 아래에 길이 28픽셀, 굵기 2픽셀 밑줄을 긋습니다. 16×16 그림은 같은 그림을 반 크기로 그립니다(§2.3, 요청서 007).
 - Ghostty에서는 조합 중인 글자가 없을 때 Shift+Space와 함께 빈 문자열을 넣습니다(§3, 요청서 001).
   - Ghostty는 입력기의 응답(소비함/넘김)을 보지 않고, 키 처리 도중에 조합 글자가 있었는지, 입력기가 글자를 넣었는지, 입력 소스가 바뀌었는지로 판단합니다.
   - 모드 전환은 Ghostty가 키 처리를 끝낸 뒤에야 반영되므로, 아무것도 넣지 않으면 Ghostty는 Shift+Space를 평범한 Space로 보고 셸에 공백을 보냅니다.
