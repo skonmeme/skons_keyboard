@@ -116,6 +116,10 @@ macOS versions and Intel Macs are not supported.
 
 The display name always starts with a lowercase "skon".
 
+The menu bar icons are template images: the menu bar draws them in the same
+color as its other icons, which follows the menu bar background (for
+example, white on a dark menu bar).
+
 macOS launches an input method only if its bundle identifier contains
 `.inputmethod.`, and expects the connection name to be the bundle identifier
 followed by `_Connection`.
@@ -611,6 +615,7 @@ works unchanged. The keychain is deleted when the release ends.
 | `spec/STANDARD/` | Supplementary files of the specification, such as figures. | English only |
 | `spec/requests/` | Spec requests waiting to be applied. | Any |
 | `spec/merged/` | Spec requests already applied. | Any |
+| `CLAUDE.md` | Instructions that Claude reads in every session. It points to this specification and holds only what must be read every time. | English only |
 | `README.md` | Installation and usage, kept short. | Korean |
 | `doc/ARCHITECTURE.md` | Detailed description of how the app works, with figures and videos. | Korean |
 | `doc/ARCHITECTURE/` | Supplementary files of `doc/ARCHITECTURE.md`. | Korean |
@@ -618,6 +623,10 @@ works unchanged. The keychain is deleted when the release ends.
 
 Documents under `doc/` are written in Korean unless there is a specific
 reason to use another language.
+
+Figures in this specification are Mermaid diagrams in the text. A figure
+that Mermaid cannot draw, such as the layout in §4.1, is an SVG file in
+`spec/STANDARD/`.
 
 If any document or source code conflicts with this specification, the
 specification is correct and the other MUST be fixed.
@@ -628,39 +637,70 @@ specification is correct and the other MUST be fixed.
   three-digit sequence number starting at `000` (for example,
   `000-Project.md`).
 - This specification changes only by applying spec requests.
+- A spec request holds what is to be reflected in this specification.
+  Other discussion is recorded in `doc/DEVELOPMENT/` (§9.5).
+- A request is written in the user's style, in short items, and keeps the
+  user's own wording. Decisions made while discussing a request with the
+  user are written into the request.
+- Requests and discussion items are recorded only in the files of §9.1,
+  never in Claude's memory.
+
+The first line of a request summarizes it in one sentence; the release
+notes show this line (§8.7). The following sections come after it, with
+these headings:
+
+| Heading | Content |
+|---|---|
+| `사용자의 요청` | What the user asked for |
+| `현재 파악된 상태` | What the specification, the source code and the documents do now, as far as the request is concerned |
+| `명세서 수정 방향` | How this specification is to change |
+| `논의사항` | Open questions, each with the user's decision once it is made |
+| `기타 연관된 문서` | Other documents that the request affects |
 
 ### 9.3 Work branches
 
 - A request is applied on the branch where the request file is committed.
   That branch is the work branch.
+- Work branches are created by the user. Claude does not create branches.
 - The work branch MUST NOT be `main` or `develop`. If a request is committed
-  on one of them, that is a problem that needs the user's decision (§9.4).
+  on one of them, or would have to be committed while one of them is checked
+  out, that is a problem that needs the user's decision (§9.4).
 - Merging develop into main makes a release (§8.7). The version in
   `Cargo.toml` MUST be raised before develop is merged into main.
 
 ### 9.4 Applying a request
 
+A request is applied only when the user asks. Until then, decisions are only
+written into the request (§9.2); this specification, the source code and the
+other documents do not change.
+
 ```mermaid
 flowchart TD
-    R["spec/requests/NNN-Title.md<br/>committed on the work branch"] --> S["Update spec/STANDARD.md"]
+    A["User asks to apply<br/>spec/requests/NNN-Title.md"] --> K["Commit the request<br/>on the work branch"]
+    K --> S["Update spec/STANDARD.md"]
     S --> C["Create or modify source code<br/>to match the specification"]
-    C --> D["Update README.md and<br/>doc/ARCHITECTURE.md if affected"]
+    C --> D["Update README.md, doc/ARCHITECTURE.md<br/>and CLAUDE.md if affected"]
     D --> M["Move the request to spec/merged/"]
     M --> Q{"Any problem?"}
     Q -- no --> G["Commit on the work branch"]
     Q -- yes --> X["Report it, do not commit"]
 ```
 
-1. Update this specification to reflect the request.
-2. Create or modify the source code so that it matches the specification.
-3. Update README.md and `doc/ARCHITECTURE.md` when they are affected.
-4. Move the request file from `spec/requests/` to `spec/merged/`.
-5. If no problem occurred, commit on the work branch automatically. A problem
+1. Commit the request file on the work branch automatically, right before
+   this specification is updated. Nothing is committed when the request has
+   no uncommitted changes.
+2. Update this specification to reflect the request.
+3. Create or modify the source code so that it matches the specification.
+4. Update README.md, `doc/ARCHITECTURE.md` and `CLAUDE.md` when they are
+   affected.
+5. Move the request file from `spec/requests/` to `spec/merged/`.
+6. If no problem occurred, commit on the work branch automatically. A problem
    is a failed build or test, or a question that needs the user's decision.
 
 ### 9.5 Discussion items
 
-- A question that needs discussion during development is recorded as one
-  file in `doc/DEVELOPMENT/`.
+- Discussion of what is to be reflected in this specification belongs in
+  the spec request (§9.2). Any other question that needs discussion during
+  development is recorded as one file in `doc/DEVELOPMENT/`.
 - When the question is resolved, the file is deleted. If the answer changes
   this specification, the change is applied through a spec request.
