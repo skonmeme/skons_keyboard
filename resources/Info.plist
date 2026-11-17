@@ -63,8 +63,6 @@
 				<true/>
 				<key>tsInputModeMenuIconFileKey</key>
 				<string>korean.tiff</string>
-				<key>tsInputModeAlternateMenuIconFileKey</key>
-				<string>korean.tiff</string>
 				<key>tsInputModePaletteIconFileKey</key>
 				<string>korean.tiff</string>
 			</dict>
@@ -83,8 +81,6 @@
 				<key>tsInputModeDefaultStateKey</key>
 				<true/>
 				<key>tsInputModeMenuIconFileKey</key>
-				<string>english.tiff</string>
-				<key>tsInputModeAlternateMenuIconFileKey</key>
 				<string>english.tiff</string>
 				<key>tsInputModePaletteIconFileKey</key>
 				<string>english.tiff</string>
