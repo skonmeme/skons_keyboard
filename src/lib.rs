@@ -5,6 +5,7 @@
 
 pub mod composer;
 pub mod engine;
+pub mod field;
 pub mod layout;
 pub mod mac;
 
