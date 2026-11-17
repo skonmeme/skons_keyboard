@@ -1,8 +1,10 @@
-//! The macOS side: the InputMethodKit controller, calls to the client, and
-//! system services. Everything here runs on the main thread.
+//! The macOS side: the InputMethodKit controller, calls to the client,
+//! number and password fields, and system services. Everything here runs on
+//! the main thread, except the requests to browsers of `fields` (§3.1).
 
 mod client;
 mod controller;
+mod fields;
 mod system;
 
 use std::cell::Cell;
@@ -81,6 +83,7 @@ pub fn run() {
         eprintln!("skonsKeyboard: cannot create the input method server");
         return;
     };
+    fields::init();
     app.run();
 }
 

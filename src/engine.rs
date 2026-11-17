@@ -1,4 +1,4 @@
-//! Key handling of both modes (§3, §4.4, §4.5, §5), independent of macOS.
+//! Key handling of both modes (§3, §3.1, §4.4, §4.5, §5), independent of macOS.
 
 use crate::composer::Composer;
 use crate::layout::{self, Output};
@@ -51,8 +51,8 @@ pub struct KeyDown {
     pub repeat: bool,
 }
 
-/// Facts about the client and the system that §3 and §4.5 need. They are
-/// asked only when those rules could apply.
+/// Facts about the client and the system that §3, §3.1 and §4.5 need. They
+/// are asked only when those rules could apply.
 pub trait Environment {
     /// The client is Terminal or Ghostty.
     fn is_terminal(&self) -> bool;
@@ -60,6 +60,8 @@ pub trait Environment {
     fn is_ghostty(&self) -> bool;
     /// The input method has the Accessibility permission.
     fn can_post_events(&self) -> bool;
+    /// Focus is in a number or password field of a browser (§3.1).
+    fn in_english_field(&self) -> bool;
 }
 
 /// A call the input method makes to the client, in order.
@@ -119,7 +121,8 @@ impl Engine {
             if calls.is_empty() && env.is_ghostty() {
                 calls.push(ClientCall::Insert(String::new()));
             }
-            if key.repeat {
+            // §3.1: an English field keeps English mode.
+            if key.repeat || (self.mode == Mode::English && env.in_english_field()) {
                 return consume(calls);
             }
             self.mode = self.mode.other();
@@ -236,6 +239,7 @@ mod tests {
         terminal: bool,
         ghostty: bool,
         permission: bool,
+        english_field: bool,
     }
 
     impl Environment for Env {
@@ -248,18 +252,28 @@ mod tests {
         fn can_post_events(&self) -> bool {
             self.permission
         }
+        fn in_english_field(&self) -> bool {
+            self.english_field
+        }
     }
 
     const APP: Env = Env {
         terminal: false,
         ghostty: false,
         permission: false,
+        english_field: false,
     };
 
     const GHOSTTY: Env = Env {
         terminal: true,
         ghostty: true,
         permission: false,
+        english_field: false,
+    };
+
+    const ENGLISH_FIELD: Env = Env {
+        english_field: true,
+        ..APP
     };
 
     fn press(code: u16) -> KeyDown {
@@ -369,6 +383,25 @@ mod tests {
         };
         assert_eq!(engine.key_down(repeat, &GHOSTTY), consume(vec![insert("")]));
         assert_eq!(engine.mode(), Mode::Korean);
+    }
+
+    #[test]
+    fn shift_space_in_an_english_field_keeps_english_mode() {
+        let mut engine = Engine::new(Mode::English);
+        assert_eq!(
+            engine.key_down(shifted(keycode::SPACE), &ENGLISH_FIELD),
+            consume(Vec::new())
+        );
+        assert_eq!(engine.mode(), Mode::English);
+        // Korean mode, chosen from the input menu, still switches to English.
+        let mut engine = composing_han();
+        assert_eq!(
+            engine.key_down(shifted(keycode::SPACE), &ENGLISH_FIELD),
+            Response {
+                switch_to: Some(Mode::English),
+                ..consume(vec![insert("한")])
+            }
+        );
     }
 
     #[test]
@@ -503,6 +536,7 @@ mod tests {
             terminal: true,
             ghostty: false,
             permission: true,
+            english_field: false,
         };
         for code in [keycode::RETURN, keycode::ESCAPE] {
             let mut engine = composing_han();
@@ -522,11 +556,13 @@ mod tests {
             terminal: true,
             ghostty: false,
             permission: false,
+            english_field: false,
         };
         let not_terminal = Env {
             terminal: false,
             ghostty: false,
             permission: true,
+            english_field: false,
         };
         for env in [&no_permission, &not_terminal] {
             let mut engine = composing_han();
@@ -540,6 +576,7 @@ mod tests {
             terminal: true,
             ghostty: false,
             permission: true,
+            english_field: false,
         };
         let mut engine = Engine::new(Mode::Korean);
         assert_eq!(

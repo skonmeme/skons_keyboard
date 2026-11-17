@@ -16,6 +16,7 @@ with it, this document is correct and the other must be fixed (§9.1).
   - [2.3 Identity and installation](#23-identity-and-installation)
   - [2.4 Resource and privacy constraints](#24-resource-and-privacy-constraints)
 - [3. Modes and Switching](#3-modes-and-switching)
+  - [3.1 Number and password fields](#31-number-and-password-fields)
 - [4. Korean Mode](#4-korean-mode)
   - [4.1 Layout](#41-layout)
   - [4.2 Composition](#42-composition)
@@ -58,6 +59,7 @@ features in this document and is designed to stay lightweight.
 | Feature | Section |
 |---|---|
 | Switching between Korean and English with Shift+Space | §3 |
+| English mode in number and password fields of Safari and Firefox | §3.1 |
 | Korean input with the Sebeolsik Final layout | §4 |
 | English input with the QWERTY layout | §5 |
 | Voice input for Korean and English speech | §6 (not yet specified) |
@@ -95,8 +97,9 @@ macOS versions and Intel Macs are not supported.
 - The product is an input method bundle built on InputMethodKit. Typing
   (§3–§5) MUST work without a helper process, a login item, the Input
   Monitoring permission or the Accessibility permission.
-- The Accessibility permission is optional. When granted, it enables only the
-  handling of Return and Escape in terminals (§4.5).
+- The Accessibility permission is optional. When granted, it enables only
+  English mode in number and password fields (§3.1) and the handling of
+  Return and Escape in terminals (§4.5).
 - The implementation language is Rust. Apple frameworks are called through
   the objc2 crates.
 - Swift MAY be used only for an Apple API that cannot be called from Rust.
@@ -148,9 +151,13 @@ Distribution and installation are specified in §8.
 ### 2.4 Resource and privacy constraints
 
 - While no input happens, the input method MUST NOT run timers, polling or
-  background threads.
+  background threads. Work that a key or a notification of §3.1 starts is
+  not idle work: §3.1 uses notifications and a serial dispatch queue, not
+  timers or polling.
 - Typing in Korean or English mode MUST NOT perform file or network I/O.
-- The input method MUST NOT store, log or transmit typed text.
+- The input method MUST NOT store, log or transmit typed text. For §3.1 it
+  reads only the roles and the subrole listed there, never the text of a
+  field.
 
 ## 3. Modes and Switching
 
@@ -174,6 +181,7 @@ stateDiagram-v2
   ignored.
 - On Shift+Space the input method commits the composition, switches to the
   other mode and consumes the event. The client never receives Shift+Space.
+  In English mode in an English field, it does not switch (§3.1).
 - Switching MUST change the input source selected in the system, not only an
   internal state. Some terminals decide whether a key was consumed by
   checking whether the input source changed.
@@ -189,6 +197,66 @@ stateDiagram-v2
   input menu), the input method commits the composition and follows the
   change. It MUST NOT request a mode change in response, because doing so can
   start a feedback loop in some applications.
+
+### 3.1 Number and password fields
+
+Number fields and password fields of web pages do not take Korean. In Safari
+(`com.apple.Safari`) and Firefox (`org.mozilla.firefox`), when the input
+method has the Accessibility permission, it selects English mode while such a
+field has focus, and selects the previous mode again when focus leaves it.
+Without the permission, this section does not apply.
+
+An *English field* is the focused element of Safari or Firefox when the
+Accessibility API reports it as below. Fields for numbers made in other ways,
+such as `type="tel"` or `inputmode="numeric"`, look like ordinary text fields
+and are not English fields (§7.4 L5).
+
+| Field | Safari | Firefox |
+|---|---|---|
+| Number field (`<input type="number">`) | Role `AXTextField` with a child of role `AXIncrementor` | Role `AXIncrementor` |
+| Password field (`<input type="password">`) | Subrole `AXSecureTextField` | Subrole `AXSecureTextField` |
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    Outside: Not in an English field
+    Inside: In an English field (English mode)
+    Outside --> Inside: Focus moves to an English field (remember the mode)
+    Inside --> Outside: Focus leaves (select the remembered mode)
+```
+
+- When focus moves to an English field from anything else, the input method
+  remembers the selected mode and selects English mode if Korean mode is
+  selected.
+  - A browser may have macOS select English mode for a password field before
+    the focus notification arrives (§7.4 L2). The remembered mode is then the
+    mode before that change: a change to English mode by the system while
+    focus is not in an English field is not remembered until focus moves to
+    anything else or Shift+Space switches modes.
+- When focus moves from an English field to another, nothing changes.
+- When focus leaves English fields, the input method selects the remembered
+  mode if another mode is selected. Focus leaves when it moves to anything
+  else in the browser (another field, the page, the address bar), or when
+  another application becomes active. For example, Return leaves a number
+  field only if the page then moves focus or loads another page.
+- When a browser becomes active, its focused element is checked as if focus
+  had moved to it.
+- In an English field, Shift+Space in English mode is consumed without
+  switching (§3). In Korean mode it switches to English mode as usual.
+- If the system selects Korean mode while focus is in an English field, for
+  example from the input menu, the input method follows (§3) and forgets the
+  remembered mode, so leaving the field changes nothing.
+- The input method selects modes here through the client, as for Shift+Space,
+  and only while one of its modes is selected in the system. If no client of
+  the input method is active at that moment, it selects the mode when a
+  client is next activated. These changes respond to focus changes, never to
+  a mode change by the system (§3).
+- Focus changes are observed with the Accessibility notification
+  `AXFocusedUIElementChanged` of the active browser. On each notification the
+  input method reads the element that has focus in the browser, not the
+  element of the notification, because the browsers also send the
+  notification for windows and groups. It reads the element on a serial
+  dispatch queue, so that its main thread never waits for a browser (§2.4).
 
 ## 4. Korean Mode
 
@@ -473,7 +541,8 @@ guaranteed applications.
 Keys are QWERTY legends. Each scenario starts in an empty text field. In
 terminals, A2 and A10 pass in one key press only when the input method has the
 Accessibility permission (§4.5). Otherwise, and for A5 and A11, the
-limitations in §7.4 apply.
+limitations in §7.4 apply. A14–A17 apply only to Safari and Firefox, with the
+Accessibility permission (§3.1).
 
 | # | Steps | Expected result |
 |---|---|---|
@@ -490,15 +559,20 @@ limitations in §7.4 apply.
 | A11 | Terminals only. Korean mode: type `m f s`, then Control+C. | `한` is committed, then the shell receives Control+C. |
 | A12 | English mode: hold down `a`. | Key repeat works as with the ABC layout. |
 | A13 | Terminals only. With nothing composed, press Shift+Space twice. | Nothing is sent to the shell, and the mode is back where it started. |
+| A14 | Korean mode: click a number field (`type="number"`) and type `123`, then click a text field and type `m f s`. | `123`, then `한`. The menu bar shows "A" while the number field has focus, and "한" after. |
+| A15 | English mode: click a number field and type `123`, then click a text field and type `abc`. | `123`, then `abc`. English mode stays. |
+| A16 | Korean mode: click a password field and type `abc`, then press Tab to move to a text field and type `m f s`. | `abc`, then `한`. |
+| A17 | In a number field, and then in a password field: press Shift+Space, then type `123`. | `123` each time. English mode stays. |
 
 ### 7.4 Known limitations
 
 | # | Applications | Limitation |
 |---|---|---|
 | L1 | Terminal, Ghostty | When a passed-through key ends a composition, the terminal may keep the committed text but drop the key, so the key must be pressed again. This is reported for Return and Escape in both terminals, and for Tab and arrow keys in Ghostty, where version 1.3.1 may instead lose the committed text. The macOS built-in Korean input method has the same problem. With the Accessibility permission, §4.5 avoids it for Return and Escape. |
-| L2 | All | In password fields, macOS allows only ASCII-capable input sources, so Korean mode is not available there. |
+| L2 | All | In password fields, applications allow only ASCII-capable input sources, so Korean mode is not available there: macOS selects English mode, or ABC if ABC was used more recently. Where §3.1 does not apply, the mode stays English after focus leaves the field, and Shift+Space there still selects Korean mode, which Firefox then lets into the password while Safari rejects the input. While ABC is selected, §3.1 does not apply either. |
 | L3 | Terminal, Ghostty | With §4.5, a key typed before the posted Return or Escape arrives may be processed ahead of it. |
 | L4 | Ghostty | A program that enables the kitty keyboard protocol still receives Shift+Space as a key event (for example `CSI 32;2u`), because Ghostty encodes the key itself when no text comes with it. What happens then depends on the program. |
+| L5 | Safari, Firefox | Fields for numbers made with `type="tel"`, `inputmode="numeric"` or a plain text field look like ordinary text fields to the Accessibility API, so §3.1 does not apply to them. |
 
 ### 7.5 Verification
 
@@ -538,11 +612,12 @@ flowchart TD
 ### 8.2 Accessibility permission
 
 - The installer shows an optional item, not selected by default, to set up
-  the Accessibility permission used by §4.5.
+  the Accessibility permission used by §3.1 and §4.5.
 - If the item is selected, the installer starts the input method once in a
   permission request mode, in the installing user's session. macOS then asks
   the user to allow the input method, not the installer, to use
-  Accessibility.
+  Accessibility. The request mode asks for both uses: the Accessibility API
+  (§3.1) and posting key events (§4.5).
 - Because the app is signed with Developer ID (§8.4), a granted permission
   stays granted when the input method is updated.
 

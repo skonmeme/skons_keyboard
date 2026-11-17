@@ -2,23 +2,43 @@
 
 use std::cell::{Cell, RefCell};
 use std::ffi::c_long;
+use std::ptr;
 
 use objc2::rc::{Allocated, Retained};
 use objc2::runtime::{AnyObject, NSObject, NSObjectProtocol};
-use objc2::{DefinedClass, define_class, msg_send};
+use objc2::{DefinedClass, Message, define_class, msg_send};
 use objc2_app_kit::{NSEvent, NSEventMask, NSEventModifierFlags, NSEventType};
 use objc2_foundation::{NSString, NSUInteger};
 use objc2_input_method_kit::{IMKInputController, IMKServer};
 
 use super::client::Client;
 use super::{
-    GHOSTTY, KEYBOARD_LAYOUT, TERMINALS, current_mode, mode_from_id, mode_id, set_current_mode,
-    system,
+    GHOSTTY, KEYBOARD_LAYOUT, TERMINALS, current_mode, fields, mode_from_id, mode_id,
+    set_current_mode, system,
 };
 use crate::engine::{ClientCall, Engine, Environment, KeyDown, Mode, Modifiers, keycode};
 
 /// `kTextServiceInputModePropertyTag` ('imim').
 const INPUT_MODE_TAG: c_long = 0x696D_696D;
+
+thread_local! {
+    /// The controller whose client is active, for the mode changes of §3.1.
+    static ACTIVE: RefCell<Option<Retained<InputController>>> = const { RefCell::new(None) };
+}
+
+/// Selects a mode through the active client, as Shift+Space does (§3.1).
+/// Returns false if no client of the input method is active.
+pub fn select_through_active(mode: Mode) -> bool {
+    let Some(controller) = ACTIVE.with_borrow(Clone::clone) else {
+        return false;
+    };
+    let client: Option<Retained<AnyObject>> = unsafe { msg_send![&*controller, client] };
+    let Some(client) = client else {
+        return false;
+    };
+    controller.switch_to(mode, Client(&client));
+    true
+}
 
 pub struct Ivars {
     engine: RefCell<Engine>,
@@ -72,14 +92,24 @@ define_class!(
         #[unsafe(method(activateServer:))]
         fn activate_server(&self, sender: Option<&AnyObject>) {
             if let Some(sender) = sender {
+                ACTIVE.set(Some(self.retain()));
                 let client = Client(sender);
                 client.override_keyboard(KEYBOARD_LAYOUT);
                 self.change_mode(current_mode(), client);
+                // §3.1: focus may have left a browser, or a mode may wait.
+                if let Some(mode) = fields::activated(client.bundle_identifier().as_deref()) {
+                    self.switch_to(mode, client);
+                }
             }
         }
 
         #[unsafe(method(deactivateServer:))]
         fn deactivate_server(&self, sender: Option<&AnyObject>) {
+            ACTIVE.with_borrow_mut(|active| {
+                if active.as_deref().is_some_and(|active| ptr::eq(active, self)) {
+                    *active = None;
+                }
+            });
             if let Some(sender) = sender {
                 self.commit(Client(sender));
             }
@@ -102,6 +132,7 @@ define_class!(
                 .and_then(|id| mode_from_id(&id.to_string()));
             if let (Some(mode), Some(sender)) = (mode, sender) {
                 // §3: follow the system, never request a change in response.
+                fields::system_changed(current_mode(), mode);
                 set_current_mode(mode);
                 let client = Client(sender);
                 client.override_keyboard(KEYBOARD_LAYOUT);
@@ -113,12 +144,13 @@ define_class!(
     unsafe impl NSObjectProtocol for InputController {}
 );
 
-/// Facts for §3 and §4.5, gathered before the engine runs so that no client
-/// call happens while the engine is borrowed.
+/// Facts for §3, §3.1 and §4.5, gathered before the engine runs so that no
+/// client call happens while the engine is borrowed.
 struct Facts {
     terminal: bool,
     ghostty: bool,
     can_post_events: bool,
+    english_field: bool,
 }
 
 impl Environment for Facts {
@@ -130,6 +162,9 @@ impl Environment for Facts {
     }
     fn can_post_events(&self) -> bool {
         self.can_post_events
+    }
+    fn in_english_field(&self) -> bool {
+        self.english_field
     }
 }
 
@@ -159,12 +194,14 @@ impl InputController {
                 .is_some_and(|id| TERMINALS.contains(&id)),
             ghostty: client_id.as_deref() == Some(GHOSTTY),
             can_post_events: commit_key && system::can_post_events(),
+            english_field: shift_space && fields::in_english_field(),
         };
 
         ivars.in_key_event.set(true);
         let response = ivars.engine.borrow_mut().key_down(key, &facts);
         apply(client, &response.calls);
         if let Some(mode) = response.switch_to {
+            fields::shift_space();
             set_current_mode(mode);
             client.select_mode(mode_id(mode));
         }
@@ -201,6 +238,14 @@ impl InputController {
         }
         let calls = ivars.engine.borrow_mut().set_mode(mode);
         apply(client, &calls);
+    }
+
+    /// Selects a mode for §3.1 as Shift+Space does: the engine follows, and
+    /// the system is asked through the client.
+    fn switch_to(&self, mode: Mode, client: Client<'_>) {
+        set_current_mode(mode);
+        self.change_mode(mode, client);
+        client.select_mode(mode_id(mode));
     }
 }
 
