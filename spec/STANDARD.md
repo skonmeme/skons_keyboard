@@ -16,6 +16,7 @@ with it, this document is correct and the other must be fixed (§9.1).
   - [2.3 Identity and installation](#23-identity-and-installation)
   - [2.4 Resource and privacy constraints](#24-resource-and-privacy-constraints)
 - [3. Modes and Switching](#3-modes-and-switching)
+  - [3.1 Number and password fields](#31-number-and-password-fields)
 - [4. Korean Mode](#4-korean-mode)
   - [4.1 Layout](#41-layout)
   - [4.2 Composition](#42-composition)
@@ -58,6 +59,7 @@ features in this document and is designed to stay lightweight.
 | Feature | Section |
 |---|---|
 | Switching between Korean and English with Shift+Space | §3 |
+| English mode in number and password fields of Safari and Firefox | §3.1 |
 | Korean input with the Sebeolsik Final layout | §4 |
 | English input with the QWERTY layout | §5 |
 | Voice input for Korean and English speech | §6 (not yet specified) |
@@ -95,8 +97,9 @@ macOS versions and Intel Macs are not supported.
 - The product is an input method bundle built on InputMethodKit. Typing
   (§3–§5) MUST work without a helper process, a login item, the Input
   Monitoring permission or the Accessibility permission.
-- The Accessibility permission is optional. When granted, it enables only the
-  handling of Return and Escape in terminals (§4.5).
+- The Accessibility permission is optional. When granted, it enables only
+  English mode in number and password fields (§3.1) and the handling of
+  Return and Escape in terminals (§4.5).
 - The implementation language is Rust. Apple frameworks are called through
   the objc2 crates.
 - Swift MAY be used only for an Apple API that cannot be called from Rust.
@@ -116,6 +119,29 @@ macOS versions and Intel Macs are not supported.
 
 The display name always starts with a lowercase "skon".
 
+The menu bar icons are template images: the menu bar draws them in the same
+color as its other icons, which follows the menu bar background (for
+example, white on a dark menu bar).
+
+Each menu bar icon is its letter with an underline below it. Both icons have
+the same layout, in pixels of the 32 × 32 image for Retina displays
+(16 × 16 points), from the top:
+
+| Part | Pixels |
+|---|---|
+| Margin | 2 |
+| Letter ("한" or "A") | 25 |
+| Gap | 2 |
+| Underline | 2 |
+| Margin | 1 |
+
+- The letter is centered horizontally. The underline is 28 pixels long,
+  longer than the letter, and also centered.
+- The 16 × 16 image for other displays is the 32 × 32 image drawn at half
+  the size.
+- The icons are drawn into `resources/` by the command `cargo xtask icons`,
+  which is part of the Cargo workspace like the command of §8.5.
+
 macOS launches an input method only if its bundle identifier contains
 `.inputmethod.`, and expects the connection name to be the bundle identifier
 followed by `_Connection`.
@@ -125,9 +151,13 @@ Distribution and installation are specified in §8.
 ### 2.4 Resource and privacy constraints
 
 - While no input happens, the input method MUST NOT run timers, polling or
-  background threads.
+  background threads. Work that a key or a notification of §3.1 starts is
+  not idle work: §3.1 uses notifications and a serial dispatch queue, not
+  timers or polling.
 - Typing in Korean or English mode MUST NOT perform file or network I/O.
-- The input method MUST NOT store, log or transmit typed text.
+- The input method MUST NOT store, log or transmit typed text. For §3.1 it
+  reads only the roles and the subrole listed there, never the text of a
+  field.
 
 ## 3. Modes and Switching
 
@@ -151,6 +181,7 @@ stateDiagram-v2
   ignored.
 - On Shift+Space the input method commits the composition, switches to the
   other mode and consumes the event. The client never receives Shift+Space.
+  In English mode in an English field, it does not switch (§3.1).
 - Switching MUST change the input source selected in the system, not only an
   internal state. Some terminals decide whether a key was consumed by
   checking whether the input source changed.
@@ -166,6 +197,66 @@ stateDiagram-v2
   input menu), the input method commits the composition and follows the
   change. It MUST NOT request a mode change in response, because doing so can
   start a feedback loop in some applications.
+
+### 3.1 Number and password fields
+
+Number fields and password fields of web pages do not take Korean. In Safari
+(`com.apple.Safari`) and Firefox (`org.mozilla.firefox`), when the input
+method has the Accessibility permission, it selects English mode while such a
+field has focus, and selects the previous mode again when focus leaves it.
+Without the permission, this section does not apply.
+
+An *English field* is the focused element of Safari or Firefox when the
+Accessibility API reports it as below. Fields for numbers made in other ways,
+such as `type="tel"` or `inputmode="numeric"`, look like ordinary text fields
+and are not English fields (§7.4 L5).
+
+| Field | Safari | Firefox |
+|---|---|---|
+| Number field (`<input type="number">`) | Role `AXTextField` with a child of role `AXIncrementor` | Role `AXIncrementor` |
+| Password field (`<input type="password">`) | Subrole `AXSecureTextField` | Subrole `AXSecureTextField` |
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    Outside: Not in an English field
+    Inside: In an English field (English mode)
+    Outside --> Inside: Focus moves to an English field (remember the mode)
+    Inside --> Outside: Focus leaves (select the remembered mode)
+```
+
+- When focus moves to an English field from anything else, the input method
+  remembers the selected mode and selects English mode if Korean mode is
+  selected.
+  - A browser may have macOS select English mode for a password field before
+    the focus notification arrives (§7.4 L2). The remembered mode is then the
+    mode before that change: a change to English mode by the system while
+    focus is not in an English field is not remembered until focus moves to
+    anything else or Shift+Space switches modes.
+- When focus moves from an English field to another, nothing changes.
+- When focus leaves English fields, the input method selects the remembered
+  mode if another mode is selected. Focus leaves when it moves to anything
+  else in the browser (another field, the page, the address bar), or when
+  another application becomes active. For example, Return leaves a number
+  field only if the page then moves focus or loads another page.
+- When a browser becomes active, its focused element is checked as if focus
+  had moved to it.
+- In an English field, Shift+Space in English mode is consumed without
+  switching (§3). In Korean mode it switches to English mode as usual.
+- If the system selects Korean mode while focus is in an English field, for
+  example from the input menu, the input method follows (§3) and forgets the
+  remembered mode, so leaving the field changes nothing.
+- The input method selects modes here through the client, as for Shift+Space,
+  and only while one of its modes is selected in the system. If no client of
+  the input method is active at that moment, it selects the mode when a
+  client is next activated. These changes respond to focus changes, never to
+  a mode change by the system (§3).
+- Focus changes are observed with the Accessibility notification
+  `AXFocusedUIElementChanged` of the active browser. On each notification the
+  input method reads the element that has focus in the browser, not the
+  element of the notification, because the browsers also send the
+  notification for windows and groups. It reads the element on a serial
+  dispatch queue, so that its main thread never waits for a browser (§2.4).
 
 ## 4. Korean Mode
 
@@ -450,7 +541,8 @@ guaranteed applications.
 Keys are QWERTY legends. Each scenario starts in an empty text field. In
 terminals, A2 and A10 pass in one key press only when the input method has the
 Accessibility permission (§4.5). Otherwise, and for A5 and A11, the
-limitations in §7.4 apply.
+limitations in §7.4 apply. A14–A17 apply only to Safari and Firefox, with the
+Accessibility permission (§3.1).
 
 | # | Steps | Expected result |
 |---|---|---|
@@ -467,15 +559,20 @@ limitations in §7.4 apply.
 | A11 | Terminals only. Korean mode: type `m f s`, then Control+C. | `한` is committed, then the shell receives Control+C. |
 | A12 | English mode: hold down `a`. | Key repeat works as with the ABC layout. |
 | A13 | Terminals only. With nothing composed, press Shift+Space twice. | Nothing is sent to the shell, and the mode is back where it started. |
+| A14 | Korean mode: click a number field (`type="number"`) and type `123`, then click a text field and type `m f s`. | `123`, then `한`. The menu bar shows "A" while the number field has focus, and "한" after. |
+| A15 | English mode: click a number field and type `123`, then click a text field and type `abc`. | `123`, then `abc`. English mode stays. |
+| A16 | Korean mode: click a password field and type `abc`, then press Tab to move to a text field and type `m f s`. | `abc`, then `한`. |
+| A17 | In a number field, and then in a password field: press Shift+Space, then type `123`. | `123` each time. English mode stays. |
 
 ### 7.4 Known limitations
 
 | # | Applications | Limitation |
 |---|---|---|
 | L1 | Terminal, Ghostty | When a passed-through key ends a composition, the terminal may keep the committed text but drop the key, so the key must be pressed again. This is reported for Return and Escape in both terminals, and for Tab and arrow keys in Ghostty, where version 1.3.1 may instead lose the committed text. The macOS built-in Korean input method has the same problem. With the Accessibility permission, §4.5 avoids it for Return and Escape. |
-| L2 | All | In password fields, macOS allows only ASCII-capable input sources, so Korean mode is not available there. |
+| L2 | All | In password fields, applications allow only ASCII-capable input sources, so Korean mode is not available there: macOS selects English mode, or ABC if ABC was used more recently. Where §3.1 does not apply, the mode stays English after focus leaves the field, and Shift+Space there still selects Korean mode, which Firefox then lets into the password while Safari rejects the input. While ABC is selected, §3.1 does not apply either. |
 | L3 | Terminal, Ghostty | With §4.5, a key typed before the posted Return or Escape arrives may be processed ahead of it. |
 | L4 | Ghostty | A program that enables the kitty keyboard protocol still receives Shift+Space as a key event (for example `CSI 32;2u`), because Ghostty encodes the key itself when no text comes with it. What happens then depends on the program. |
+| L5 | Safari, Firefox | Fields for numbers made with `type="tel"`, `inputmode="numeric"` or a plain text field look like ordinary text fields to the Accessibility API, so §3.1 does not apply to them. |
 
 ### 7.5 Verification
 
@@ -515,11 +612,12 @@ flowchart TD
 ### 8.2 Accessibility permission
 
 - The installer shows an optional item, not selected by default, to set up
-  the Accessibility permission used by §4.5.
+  the Accessibility permission used by §3.1 and §4.5.
 - If the item is selected, the installer starts the input method once in a
   permission request mode, in the installing user's session. macOS then asks
   the user to allow the input method, not the installer, to use
-  Accessibility.
+  Accessibility. The request mode asks for both uses: the Accessibility API
+  (§3.1) and posting key events (§4.5).
 - Because the app is signed with Developer ID (§8.4), a granted permission
   stays granted when the input method is updated.
 
@@ -611,6 +709,7 @@ works unchanged. The keychain is deleted when the release ends.
 | `spec/STANDARD/` | Supplementary files of the specification, such as figures. | English only |
 | `spec/requests/` | Spec requests waiting to be applied. | Any |
 | `spec/merged/` | Spec requests already applied. | Any |
+| `CLAUDE.md` | Instructions that Claude reads in every session. It points to this specification and holds only what must be read every time. | English only |
 | `README.md` | Installation and usage, kept short. | Korean |
 | `doc/ARCHITECTURE.md` | Detailed description of how the app works, with figures and videos. | Korean |
 | `doc/ARCHITECTURE/` | Supplementary files of `doc/ARCHITECTURE.md`. | Korean |
@@ -618,6 +717,10 @@ works unchanged. The keychain is deleted when the release ends.
 
 Documents under `doc/` are written in Korean unless there is a specific
 reason to use another language.
+
+Figures in this specification are Mermaid diagrams in the text. A figure
+that Mermaid cannot draw, such as the layout in §4.1, is an SVG file in
+`spec/STANDARD/`.
 
 If any document or source code conflicts with this specification, the
 specification is correct and the other MUST be fixed.
@@ -628,39 +731,70 @@ specification is correct and the other MUST be fixed.
   three-digit sequence number starting at `000` (for example,
   `000-Project.md`).
 - This specification changes only by applying spec requests.
+- A spec request holds what is to be reflected in this specification.
+  Other discussion is recorded in `doc/DEVELOPMENT/` (§9.5).
+- A request is written in the user's style, in short items, and keeps the
+  user's own wording. Decisions made while discussing a request with the
+  user are written into the request.
+- Requests and discussion items are recorded only in the files of §9.1,
+  never in Claude's memory.
+
+The first line of a request summarizes it in one sentence; the release
+notes show this line (§8.7). The following sections come after it, with
+these headings:
+
+| Heading | Content |
+|---|---|
+| `사용자의 요청` | What the user asked for |
+| `현재 파악된 상태` | What the specification, the source code and the documents do now, as far as the request is concerned |
+| `명세서 수정 방향` | How this specification is to change |
+| `논의사항` | Open questions, each with the user's decision once it is made |
+| `기타 연관된 문서` | Other documents that the request affects |
 
 ### 9.3 Work branches
 
 - A request is applied on the branch where the request file is committed.
   That branch is the work branch.
+- Work branches are created by the user. Claude does not create branches.
 - The work branch MUST NOT be `main` or `develop`. If a request is committed
-  on one of them, that is a problem that needs the user's decision (§9.4).
+  on one of them, or would have to be committed while one of them is checked
+  out, that is a problem that needs the user's decision (§9.4).
 - Merging develop into main makes a release (§8.7). The version in
   `Cargo.toml` MUST be raised before develop is merged into main.
 
 ### 9.4 Applying a request
 
+A request is applied only when the user asks. Until then, decisions are only
+written into the request (§9.2); this specification, the source code and the
+other documents do not change.
+
 ```mermaid
 flowchart TD
-    R["spec/requests/NNN-Title.md<br/>committed on the work branch"] --> S["Update spec/STANDARD.md"]
+    A["User asks to apply<br/>spec/requests/NNN-Title.md"] --> K["Commit the request<br/>on the work branch"]
+    K --> S["Update spec/STANDARD.md"]
     S --> C["Create or modify source code<br/>to match the specification"]
-    C --> D["Update README.md and<br/>doc/ARCHITECTURE.md if affected"]
+    C --> D["Update README.md, doc/ARCHITECTURE.md<br/>and CLAUDE.md if affected"]
     D --> M["Move the request to spec/merged/"]
     M --> Q{"Any problem?"}
     Q -- no --> G["Commit on the work branch"]
     Q -- yes --> X["Report it, do not commit"]
 ```
 
-1. Update this specification to reflect the request.
-2. Create or modify the source code so that it matches the specification.
-3. Update README.md and `doc/ARCHITECTURE.md` when they are affected.
-4. Move the request file from `spec/requests/` to `spec/merged/`.
-5. If no problem occurred, commit on the work branch automatically. A problem
+1. Commit the request file on the work branch automatically, right before
+   this specification is updated. Nothing is committed when the request has
+   no uncommitted changes.
+2. Update this specification to reflect the request.
+3. Create or modify the source code so that it matches the specification.
+4. Update README.md, `doc/ARCHITECTURE.md` and `CLAUDE.md` when they are
+   affected.
+5. Move the request file from `spec/requests/` to `spec/merged/`.
+6. If no problem occurred, commit on the work branch automatically. A problem
    is a failed build or test, or a question that needs the user's decision.
 
 ### 9.5 Discussion items
 
-- A question that needs discussion during development is recorded as one
-  file in `doc/DEVELOPMENT/`.
+- Discussion of what is to be reflected in this specification belongs in
+  the spec request (§9.2). Any other question that needs discussion during
+  development is recorded as one file in `doc/DEVELOPMENT/`.
 - When the question is resolved, the file is deleted. If the answer changes
   this specification, the change is applied through a spec request.

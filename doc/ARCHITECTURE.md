@@ -17,6 +17,7 @@ flowchart LR
         P["Composer<br/>(조합)"]
         L["layout<br/>(세벌식 최종 배열)"]
         Y["system<br/>(키 다시 보내기, 권한, 입력 소스 등록)"]
+        F["fields<br/>(숫자·암호 칸, 브라우저의 포커스)"]
     end
     A <--> K
     K <--> S
@@ -25,6 +26,8 @@ flowchart LR
     E --> P
     E --> L
     C --> Y
+    C <--> F
+    A -. "손쉬운 사용 포커스 알림" .-> F
 ```
 
 - 입력기는 InputMethodKit 입력기 번들 하나(`skonsKeyboard.app`)이고, 모두 Rust로 작성했습니다(§2.2). Apple 프레임워크는 objc2 crate로 부릅니다.
@@ -37,16 +40,18 @@ flowchart LR
 |---|---|
 | `src/layout.rs` | 세벌식 최종 배열표 47개 키(§4.1). 가상 키 코드로 키를 찾습니다. |
 | `src/composer.rs` | 한 음절의 조합 규칙과 조합 결합표(§4.2), 화면에 보일 글자(§4.3). |
-| `src/engine.rs` | 두 모드의 키 처리 결정(§3, §4.4, §4.5, §5). 앱에 할 호출 목록을 돌려줍니다. |
+| `src/engine.rs` | 두 모드의 키 처리 결정(§3, §3.1, §4.4, §4.5, §5). 앱에 할 호출 목록을 돌려줍니다. |
+| `src/field.rs` | 숫자·암호 칸 판단과, 칸을 벗어날 때 돌아갈 모드(§3.1). macOS와 무관한 순수 코드입니다. |
 | `src/spec_tests.rs` | 스펙 문서의 배열표와 결합표를 읽어 코드의 표와 비교하는 테스트. |
-| `src/mac/controller.rs` | InputMethodKit 컨트롤러. macOS 이벤트를 `Engine`에 넘기고 결과를 앱에 적용합니다. |
+| `src/mac/controller.rs` | InputMethodKit 컨트롤러. macOS 이벤트를 `Engine`에 넘기고 결과를 앱에 적용합니다. 활성 컨트롤러를 기억합니다(§3.1). |
 | `src/mac/client.rs` | 앱(클라이언트)에 보내는 호출. 글자 넣기, 조합 중 글자 표시, 모드 선택, 자판 지정. |
-| `src/mac/system.rs` | 키 다시 보내기와 손쉬운 사용 권한(§4.5), 입력 소스 등록과 해제(§8). |
+| `src/mac/fields.rs` | Safari와 Firefox의 포커스 알림을 받아 숫자·암호 칸에 들어가고 벗어나는 것을 알아냅니다(§3.1). |
+| `src/mac/system.rs` | 키 다시 보내기와 손쉬운 사용 권한(§3.1, §4.5), 현재 입력 소스 확인, 입력 소스 등록과 해제(§8). |
 | `src/mac/mod.rs` | 입력기 서버 실행, 식별자 상수, 현재 모드. |
 | `src/main.rs` | 실행 파일. 인자가 없으면 입력기로 동작하고, 설치 스크립트용 보조 명령이 있습니다. |
 | `resources/` | `Info.plist`, 모드 이름(`en.lproj/InfoPlist.strings`), 메뉴 막대 아이콘. |
 | `packaging/` | 설치본과 제거본의 화면 정의, 설치 스크립트, 안내 페이지. |
-| `xtask/` | 설치본을 만드는 명령 `cargo xtask package`(§8.5)와 릴리즈용 명령 `release-check`, `release-notes`(§8.7). |
+| `xtask/` | 설치본을 만드는 명령 `cargo xtask package`(§8.5), 릴리즈용 명령 `release-check`, `release-notes`(§8.7), 메뉴 막대 아이콘을 그리는 명령 `icons`(§2.3). |
 | `.github/workflows/release.yml` | develop이 main에 병합되면 릴리즈하는 GitHub Actions 워크플로(§8.7). |
 
 ## 3. 키 하나가 처리되는 과정
@@ -98,6 +103,8 @@ sequenceDiagram
 
 - 두 모드는 각각 별도의 입력 소스입니다(§3). Shift+Space는 시스템에서 선택된 입력 소스 자체를 바꿉니다(`selectInputMode`).
   - 그래서 메뉴 막대 아이콘이 바뀝니다.
+  - 아이콘은 템플릿 이미지(`TISIconIsTemplate`)라서 macOS가 다른 메뉴 막대 아이콘과 같은 색으로 칠합니다(§2.3). macOS 기본 입력기처럼 보조 메뉴 아이콘(`tsInputModeAlternateMenuIconFileKey`)은 두지 않습니다(요청서 005).
+  - `cargo xtask icons`가 아이콘을 그립니다. 32×32 그림에서 Apple SD Gothic Neo SemiBold의 글자 윤곽을 높이 25픽셀로 맞춰 칠하고, 그 아래에 길이 28픽셀, 굵기 2픽셀 밑줄을 긋습니다. 16×16 그림은 같은 그림을 반 크기로 그립니다(§2.3, 요청서 007).
 - Ghostty에서는 조합 중인 글자가 없을 때 Shift+Space와 함께 빈 문자열을 넣습니다(§3, 요청서 001).
   - Ghostty는 입력기의 응답(소비함/넘김)을 보지 않고, 키 처리 도중에 조합 글자가 있었는지, 입력기가 글자를 넣었는지, 입력 소스가 바뀌었는지로 판단합니다.
   - 모드 전환은 Ghostty가 키 처리를 끝낸 뒤에야 반영되므로, 아무것도 넣지 않으면 Ghostty는 Shift+Space를 평범한 Space로 보고 셸에 공백을 보냅니다.
@@ -106,6 +113,47 @@ sequenceDiagram
 - 시스템이 모드를 바꿨다고 알려 오면(`setValue:forTag:client:`) 그대로 따르기만 하고, 다시 모드 변경을 요청하지 않습니다. 요청하면 Chromium 계열 앱에서 무한 반복이 생길 수 있기 때문입니다.
 - 현재 모드는 모든 컨트롤러가 함께 씁니다(`CURRENT_MODE`). 새 앱으로 옮겨 가면 그 앱의 컨트롤러가 활성화될 때 현재 모드를 따릅니다.
 - 활성화될 때와 모드가 바뀔 때마다 ABC 자판을 지정합니다(`overrideKeyboardWithKeyboardNamed`). 그래서 넘긴 키와 단축키는 언제나 QWERTY 자리로 동작합니다(§5).
+
+### 숫자 칸과 암호 칸 (§3.1)
+
+Safari와 Firefox에서 손쉬운 사용 권한이 있으면, 숫자 칸과 암호 칸에 포커스가 있는 동안 English 모드로 바꾸고, 칸을 벗어나면 원래 모드로 돌립니다(요청서 008).
+
+```mermaid
+sequenceDiagram
+    participant B as 브라우저
+    participant F as fields (메인 스레드)
+    participant Q as 직렬 큐
+    participant C as 활성 SKInputController
+    B-->>F: AXFocusedUIElementChanged
+    F->>Q: 포커스 확인 (번호를 붙임)
+    Q->>B: 포커스된 요소의 역할, 서브롤, 자식 역할
+    Q-->>F: 숫자·암호 칸인지 (최신 번호만 반영)
+    F->>F: Fields가 돌아갈 모드를 정함
+    F->>C: selectInputMode (English 또는 기억한 모드)
+```
+
+- 입력기는 앱에서 칸 종류를 받지 못하므로, 손쉬운 사용 API로 포커스된 요소의 역할을 읽습니다(§3.1의 표).
+  - Safari는 숫자 칸을 `AXTextField`로 보이고 그 안에 증감 버튼(`AXIncrementor`)을 둡니다. Firefox는 숫자 칸 자체가 `AXIncrementor`입니다. 암호 칸은 둘 다 서브롤이 `AXSecureTextField`입니다.
+  - `type="tel"`이나 `inputmode="numeric"` 칸은 보통 텍스트 칸과 구분되지 않습니다(§7.4 L5).
+  - 역할과 서브롤만 읽고, 칸의 글자는 읽지 않습니다(§2.4).
+- 포커스가 바뀔 때 입력기가 받는 신호는 브라우저마다 다릅니다.
+  - Safari는 웹 화면 전체가 입력 컨텍스트 하나라서, 칸끼리 옮겨도 입력기의 활성화와 비활성화가 없습니다.
+  - Firefox는 편집할 수 있는 칸에 들어갈 때마다 비활성화 뒤 활성화를 흉내 냅니다.
+  - 그래서 브라우저 앱에 `AXFocusedUIElementChanged` 관찰자를 붙입니다. 알림의 요소가 창이나 그룹일 때가 있어서, 알림이 오면 앱에서 포커스된 요소를 다시 읽습니다.
+- 브라우저에 묻는 일은 직렬 디스패치 큐에서 합니다. 브라우저가 키 처리(`handleEvent`) 등으로 입력기를 기다리는 동안 입력기가 메인 스레드에서 브라우저에 물으면 서로 기다리게 되기 때문입니다.
+  - 결과는 메인 스레드에서 반영합니다. 그사이 새 확인이 시작됐으면 이전 결과는 버립니다.
+  - 손쉬운 사용 요청의 시간 제한은 1초입니다.
+- 관찰자는 브라우저의 컨트롤러가 활성화될 때 붙이고, 그때 포커스도 한 번 확인합니다. 활성화 콜백 안에서는 브라우저에 묻지 않고 메인 큐로 미룹니다.
+- 모드는 Shift+Space처럼 활성 컨트롤러의 클라이언트로 바꿉니다(`selectInputMode`).
+  - 다른 프로세스에서 `TISSelectInputSource`로 바꾸면 Safari에서는 메뉴 막대만 바뀌고 실제 입력은 그대로였습니다.
+  - 활성 클라이언트가 없으면(예: Safari에서 페이지 바탕을 누름) 바꿀 모드를 기억해 두었다가 다음 활성화 때 바꿉니다.
+  - 이 입력기의 모드가 선택돼 있을 때만 바꿉니다. ABC 같은 다른 입력 소스를 쓰는 중에는 아무것도 하지 않습니다.
+- 돌아갈 모드는 `src/field.rs`의 `Fields`가 정합니다.
+  - 숫자·암호 칸에 들어가기 직전 모드를 기억하고, 칸을 벗어나면 그 모드로 돌립니다. 칸끼리 옮기면 그대로입니다.
+  - Firefox는 암호 칸의 입력 소스 제한(영문 강제)을 포커스 알림보다 먼저 합니다. 그래서 칸 밖에서 시스템이 English 모드로 바꾼 것은, 포커스가 다른 곳으로 가거나 Shift+Space를 누를 때까지 기억할 모드로 치지 않습니다.
+  - 칸 안에서 입력 메뉴로 한글 모드를 고르면 기억한 모드를 버립니다.
+  - 다른 앱의 컨트롤러가 활성화되면 칸을 벗어난 것으로 봅니다.
+- 칸 안에서 English 모드일 때 Shift+Space는 소비만 하고 모드를 바꾸지 않습니다(`Environment::in_english_field`).
 
 ## 6. 앱과 주고받는 방식
 
@@ -163,13 +211,13 @@ flowchart TD
 - 앱 번들이 다른 위치로 옮겨 설치되지 않도록 구성 정보에서 재배치를 끕니다(`BundleIsRelocatable = NO`).
 - 설치본은 두 가지 선택 항목을 보여 줍니다.
   - 입력기: 필수
-  - 터미널 Return/Esc 보정: 선택, 기본값은 선택 안 함
+  - 손쉬운 사용 권한 (숫자·암호 칸 영문, 터미널 Return/Esc 보정): 선택, 기본값은 선택 안 함
 - 설치 스크립트는 관리자 권한으로 돕니다. 사용자 세션이 필요한 일은 `launchctl asuser`로 콘솔 사용자 세션에서 입력기 실행 파일의 보조 명령을 부릅니다.
 
 | 보조 명령 | 부르는 곳 | 하는 일 |
 |---|---|---|
 | `skonsKeyboard --register` | 설치 | 입력 소스를 등록하고 두 모드를 켬 |
-| `open -a skonsKeyboard.app --args --request-accessibility` | 터미널 보정을 고른 설치 | 손쉬운 사용 권한 요청 창을 띄움 |
+| `open -a skonsKeyboard.app --args --request-accessibility` | 손쉬운 사용 항목을 고른 설치 | 손쉬운 사용 권한 요청 창을 띄움. 다른 앱 읽기(§3.1, `AXIsProcessTrustedWithOptions`)와 키 보내기(§4.5, `CGRequestPostEventAccess`)를 각각 아직 없을 때만 요청 |
 | `skonsKeyboard --unregister` | 제거 | 두 모드를 끔 |
 
 - 권한 요청은 반드시 입력기 앱이 해야 권한이 입력기에 붙습니다. 그래서 `open`(Launch Services)으로 입력기를 실행합니다. 터미널에서 실행 파일을 바로 실행하면 권한이 터미널 앱에 붙을 수 있습니다.
@@ -207,6 +255,7 @@ flowchart TD
 - `cargo test`: 앱 없이 도는 테스트입니다.
   - 배열표, 조합 규칙, 스펙 예시(§4.2)
   - 키 처리 표의 각 행(§4.4), Shift+Space, 터미널 조건(§4.5)
+  - 숫자·암호 칸 판단, 돌아갈 모드, 칸 안의 Shift+Space(§3.1)
   - 스펙 문서와 코드의 표 비교, `Info.plist`와 코드의 식별자 비교
 - 앱별 동작은 설치한 뒤 §7.3의 인수 시나리오를 보장 대상 앱마다 손으로 확인합니다.
 
@@ -219,4 +268,6 @@ flowchart TD
 - 구름 입력기 포크의 Return 재전송: https://github.com/zidell/gureum/commit/6e03ee3
 - ongeul: https://github.com/hiking90/ongeul
 - iTerm2의 수정: https://github.com/gnachman/iTerm2/commit/52fdf26
+- WebKit의 입력 컨텍스트와 암호 칸 처리(`WebViewImpl::inputContext`, `updateSecureInputState`, `setMarkedText`): https://github.com/WebKit/WebKit/blob/main/Source/WebKit/UIProcess/mac/WebViewImpl.mm
+- Firefox의 포커스 변경 흉내와 암호 칸 입력 소스 제한(`NotifyIMEOfFocusChangeInGecko`, `SyncASCIICapableOnly`): https://github.com/mozilla-firefox/firefox/blob/main/widget/cocoa/TextInputHandler.mm
 - 공증: https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution
